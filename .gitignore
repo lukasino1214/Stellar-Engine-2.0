@@ -1,2 +1,7 @@
 .out*
 .vs*
+.cache/
+build/
+imgui.ini
+*.exr
+compile_commands.json

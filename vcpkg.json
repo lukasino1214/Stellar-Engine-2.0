@@ -1,7 +1,42 @@
 {
-  "name": "cpp-blank-project",
+  "name": "stellar-engine",
   "version": "0.1.0",
   "dependencies": [
-    
-  ]
+    {
+      "name": "daxa",
+      "features": [
+        "utils-imgui",
+        "utils-mem",
+        "utils-pipeline-manager-glslang",
+        "utils-task-list"
+      ]
+    },
+    {
+      "name": "glfw3",
+      "features": [
+        "xlib",
+        "wayland"
+      ]
+    },
+    {
+      "name": "imgui",
+      "features": [
+          "glfw-binding",
+          "docking-experimental"
+        ]
+    },
+    "openal-soft",
+    "glm",
+    "stb",
+    "flecs",
+    "nlohmann-json"
+  ],
+  "vcpkg-configuration": {
+    "overlay-ports": [
+      "/home/lukas/dev/projects/Daxa/cmake/vcpkg-port",
+      "/home/lukas/dev/projects/Daxa/cmake/vcpkg-overlay-ports/dxc",
+      "/home/lukas/dev/projects/Daxa/cmake/vcpkg-overlay-ports/glfw3",
+      "/home/lukas/dev/projects/Daxa/cmake/vcpkg-overlay-ports/fsr2"
+    ]
+  }
 }

@@ -9,7 +9,7 @@
         {
             "name": "defaults",
             "hidden": true,
-            "binaryDir": "${sourceDir}/build/${presetName}",
+            "binaryDir": "${sourceDir}/build/",
             "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
             "generator": "Ninja Multi-Config",
             "cacheVariables": {
