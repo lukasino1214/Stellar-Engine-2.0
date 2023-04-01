@@ -2,8 +2,7 @@
 
 #include <flecs.h>
 
-#include <string_view>
-#include <string>
+#include <core/types.hpp>
 
 namespace Stellar {
     struct Entity;

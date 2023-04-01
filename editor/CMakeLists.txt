@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(stellar_engine VERSION 0.1.0)
+add_executable(${PROJECT_NAME} "main.cpp" "editor.cpp")
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+set_project_warnings(${PROJECT_NAME})
+
+target_link_libraries(${PROJECT_NAME} PRIVATE daxa::daxa)
+target_link_libraries(${PROJECT_NAME} PRIVATE Engine)

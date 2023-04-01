@@ -2,11 +2,10 @@
 
 #include <GLFW/glfw3.h>
 
-#include <string_view>
 #include <atomic>
 
+#include <core/types.hpp>
 #include <daxa/daxa.hpp>
-using namespace daxa::types;
 
 namespace Stellar {
     struct Window {
@@ -28,8 +27,8 @@ namespace Stellar {
         auto get_native_platform() -> daxa::NativeWindowPlatform;
         auto get_native_handle() -> daxa::NativeWindowHandle;
 
-        int width;
-        int height;
+        i32 width;
+        i32 height;
         std::string_view name;
 
         GLFWwindow* glfw_window_ptr;

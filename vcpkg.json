@@ -29,7 +29,8 @@
     "glm",
     "stb",
     "flecs",
-    "nlohmann-json"
+    "yaml-cpp",
+    "spdlog"
   ],
   "vcpkg-configuration": {
     "overlay-ports": [

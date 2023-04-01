@@ -49,7 +49,7 @@ namespace Stellar {
             .enable_unnormalized_coordinates = false,
         });
 
-        auto staging_texture_buffer_ptr = device.get_host_address_as<u8>(staging_texture_buffer);
+        auto* staging_texture_buffer_ptr = device.get_host_address_as<u8>(staging_texture_buffer);
         std::memcpy(staging_texture_buffer_ptr, data, static_cast<u32>(size_x * size_y) * static_cast<u32>(4 * sizeof(u8)));
 
         daxa::CommandList cmd_list = device.create_command_list({ .debug_name = "upload cmd list" });

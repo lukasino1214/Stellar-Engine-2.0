@@ -4,7 +4,7 @@
 #include <daxa/utils/pipeline_manager.hpp>
 #include <daxa/utils/imgui.hpp>
 
-#include "window.hpp"
+#include <core/window.hpp>
 
 namespace Stellar {
     struct Context {

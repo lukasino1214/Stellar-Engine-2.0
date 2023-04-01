@@ -1,5 +1,4 @@
 #include <chrono>
-#include <daxa/swapchain.hpp>
 #include <iostream>
 
 #include <daxa/daxa.hpp>
@@ -11,8 +10,9 @@
 #include <stdexcept>
 #include <string_view>
 
-#include "window.hpp"
-#include "texture.hpp"
+#include <graphics/texture.hpp>
+#include <core/window.hpp>
+
 
 #include "../shaders/shared.inl"
 
