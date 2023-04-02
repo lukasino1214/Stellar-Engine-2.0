@@ -21,8 +21,6 @@ using namespace std::literals;
 
 #include "editor.hpp"
 
-#include <flecs.h>
-
 auto loading_screen(Stellar::Context& context, daxa::Swapchain swapchain) -> bool {
     Stellar::Texture texture = Stellar::Texture(context.device, "pic.png");
 

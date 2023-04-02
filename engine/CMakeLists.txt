@@ -10,6 +10,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     "core/uuid.cpp" 
     "core/window.cpp" 
     "data/scene.cpp" 
+    "data/entity.hpp"
     "data/entity.cpp"
     "graphics/texture.cpp" 
 )
@@ -27,8 +28,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE OpenAL::OpenAL)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE daxa::daxa)
 
-find_package(flecs CONFIG REQUIRED)
-target_link_libraries(${PROJECT_NAME} PRIVATE flecs::flecs)
+find_package(EnTT CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE EnTT::EnTT)
 
 find_package(yaml-cpp CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE yaml-cpp)

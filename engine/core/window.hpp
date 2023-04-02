@@ -9,7 +9,7 @@
 
 namespace Stellar {
     struct Window {
-        Window(int _width, int _height, const std::string_view& _name);
+        Window(i32 _width, i32 _height, const std::string& _name);
         ~Window();
 
         [[nodiscard]] auto should_close() const -> bool;
@@ -29,7 +29,7 @@ namespace Stellar {
 
         i32 width;
         i32 height;
-        std::string_view name;
+        std::string name;
 
         GLFWwindow* glfw_window_ptr;
     };

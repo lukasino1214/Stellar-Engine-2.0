@@ -5,6 +5,7 @@
 #include <vector>
 #include <string_view>
 #include <string>
+#include <memory>
 
 namespace Stellar {
     inline namespace Types {

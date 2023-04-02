@@ -28,7 +28,7 @@
     "openal-soft",
     "glm",
     "stb",
-    "flecs",
+    "entt",
     "yaml-cpp",
     "spdlog"
   ],

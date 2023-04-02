@@ -1,9 +1,14 @@
 #include "editor.hpp"
+#include "core/types.hpp"
+#include "data/components.hpp"
 
 #include <thread>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
+
+#include <data/scene.hpp>
+#include <data/entity.hpp>
 
 namespace Stellar {
     Editor::Editor(Context&& _context, Window&& _window, daxa::Swapchain&& _swapchain, const std::string_view& project_path) : context{_context}, window{_window}, swapchain{_swapchain} {
@@ -26,6 +31,20 @@ namespace Stellar {
         });
 
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        
+        Scene scene("Test");
+        auto e = scene.create_entity("pog");
+        auto& tc = e.add_component<TransformComponent>();
+        tc.position = { 1.0f, 2.0f, 3.0f };
+        tc.rotation = { 80.0f, 60.0f, 20.0f };
+
+        auto e1 = scene.create_entity("test");
+        auto e2 = scene.create_entity("lol");
+
+        e.get_component<RelationshipComponent>().children = { e1, e2 };
+
+        scene.serialize("test.scene");
+        scene.deserialize("test.scene");
     }
 
     Editor::~Editor() {

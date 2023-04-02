@@ -18,7 +18,7 @@ using HWND = void *;
 static std::atomic_int window_count = 0;
 
 namespace Stellar {
-    Window::Window(i32 _width, i32 _height, const std::string_view& _name) : width{_width}, height{_height}, name{_name}, glfw_window_ptr{nullptr} {
+    Window::Window(i32 _width, i32 _height, const std::string& _name) : width{_width}, height{_height}, name{_name}, glfw_window_ptr{nullptr} {
         open();
     }
 
