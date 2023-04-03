@@ -91,9 +91,19 @@ namespace Stellar {
         return entity;
     }
 
-    void Scene::destroy_entity(Entity entity) {
+    void Scene::destroy_entity(Entity entity) const {
         registry->destroy(entity.handle);
     }
+
+    void Scene::iterate(std::function<void(Entity)> fn) {
+        registry->each([&](auto entity_handle) {
+            Entity entity = {entity_handle, this};
+            if (!entity)
+                return;
+
+            fn(entity);
+        });
+    };
 
     void Scene::serialize(const std::string_view& path) {
         YAML::Emitter out;

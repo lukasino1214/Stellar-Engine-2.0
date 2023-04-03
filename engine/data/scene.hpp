@@ -6,19 +6,21 @@
 #include <data/components.hpp>
 #include <core/types.hpp>
 
-#include <string_view>
+#include <functional>
 
 namespace Stellar {
     struct Entity;
 
     struct Scene {
-        Scene(const std::string_view& _name);
+        explicit Scene(const std::string_view& _name);
         ~Scene() = default;
 
         auto create_entity(const std::string_view& _name) -> Entity;
         auto create_entity_with_UUID(const std::string_view& _name, UUID _uuid) -> Entity;
 
-        void destroy_entity(Entity entity);
+        void destroy_entity(Entity entity) const;
+
+        void iterate(std::function<void(Entity)> fn);
 
         void serialize(const std::string_view& path);
         void deserialize(const std::string_view& path);

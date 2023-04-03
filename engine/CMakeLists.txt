@@ -12,7 +12,12 @@ target_sources(${PROJECT_NAME} PRIVATE
     "data/scene.cpp" 
     "data/entity.hpp"
     "data/entity.cpp"
-    "graphics/texture.cpp" 
+    "data/components.cpp"
+    "graphics/texture.cpp"
+    "utils/utils.hpp"
+    "utils/utils.cpp"
+    "utils/gui.hpp"
+    "utils/gui.cpp"
 )
 
 set_project_warnings(${PROJECT_NAME})

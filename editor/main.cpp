@@ -204,7 +204,7 @@ auto project_selection(Stellar::Context& context, Stellar::Window& window, daxa:
     return "";
 }
 
-auto main() -> int {
+auto main() -> i32 {
     Stellar::Context context;
 
     context.context = daxa::create_context({

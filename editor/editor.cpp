@@ -1,7 +1,12 @@
 #include "editor.hpp"
 #include "core/types.hpp"
 #include "data/components.hpp"
+#include "panel/asset_browser_panel.hpp"
+#include "panel/performance_stats_panel.hpp"
+#include "panel/scene_hiearchy_panel.hpp"
+#include "panel/toolbar_panel.hpp"
 
+#include <memory>
 #include <thread>
 
 #include <imgui.h>
@@ -32,19 +37,35 @@ namespace Stellar {
 
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         
-        Scene scene("Test");
-        auto e = scene.create_entity("pog");
+        std::shared_ptr<Scene> scene = std::make_shared<Scene>("Test");
+        auto e = scene->create_entity("pog");
         auto& tc = e.add_component<TransformComponent>();
         tc.position = { 1.0f, 2.0f, 3.0f };
         tc.rotation = { 80.0f, 60.0f, 20.0f };
 
-        auto e1 = scene.create_entity("test");
-        auto e2 = scene.create_entity("lol");
+        auto e1 = scene->create_entity("test");
+        auto e2 = scene->create_entity("lol");
 
+        e1.get_component<RelationshipComponent>().parent = e;
+        e2.get_component<RelationshipComponent>().parent = e;
         e.get_component<RelationshipComponent>().children = { e1, e2 };
 
-        scene.serialize("test.scene");
-        scene.deserialize("test.scene");
+        scene->serialize("test.scene");
+        scene->deserialize("test.scene");
+
+        scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene);
+        asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
+        toolbar_panel = std::make_unique<ToolbarPanel>();
+        performance_stats_panel = std::make_unique<PerformanceStatsPanel>();
+
+        glfwSetWindowUserPointer(window.glfw_window_ptr, this);
+        glfwSetFramebufferSizeCallback(window.glfw_window_ptr, [](GLFWwindow * window_ptr, i32 w, i32 h) {
+            auto& app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
+            app.on_resize(static_cast<u32>(w), static_cast<u32>(h));
+        });
+
+        size_x = swapchain.get_surface_extent().x;
+        size_y = swapchain.get_surface_extent().y;
     }
 
     Editor::~Editor() {
@@ -64,6 +85,14 @@ namespace Stellar {
     }
 
     void Editor::ui_update() {
+        f64 currentFrameTime = glfwGetTime();
+
+        deltaTime = static_cast<f32>(currentFrameTime - lastFrameTime);
+        lastFrameTime = currentFrameTime;
+
+        upTime = static_cast<f32>(currentFrameTime);
+        FPS = static_cast<u32>(glm::ceil(1.0f / deltaTime));
+
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
@@ -86,22 +115,16 @@ namespace Stellar {
             ImGui::End();
         }
 
-        ImGui::Begin("Scene Hiearchy");
-        ImGui::End();
+        performance_stats_panel->fps = FPS;
+        performance_stats_panel->delta_time = deltaTime;
+        performance_stats_panel->up_time = upTime;
 
-        ImGui::Begin("Entity Properties");
-        ImGui::End();
-
-        ImGui::Begin("Asset Browser");
-        ImGui::End();
-
-        ImGui::Begin("Asset Tree");
-        ImGui::End();
+        scene_hiearchy_panel->draw();
+        asset_browser_panel->draw();
+        toolbar_panel->draw();
+        performance_stats_panel->draw();
 
         ImGui::Begin("Viewport");
-        ImGui::End();
-
-        ImGui::Begin("##Toolbar");
         ImGui::End();
 
         ImGui::Render();
@@ -126,7 +149,7 @@ namespace Stellar {
             .dst_image = swapchain_image
         });
 
-        imgui_renderer.record_commands(ImGui::GetDrawData(), cmd_list, swapchain_image, static_cast<u32>(window.width), static_cast<u32>(window.height));
+        imgui_renderer.record_commands(ImGui::GetDrawData(), cmd_list, swapchain_image, size_x, size_y);
 
         cmd_list.pipeline_barrier_image_transition({
             .awaited_pipeline_access = daxa::AccessConsts::ALL_GRAPHICS_READ_WRITE,
@@ -148,5 +171,18 @@ namespace Stellar {
             .wait_binary_semaphores = {swapchain.get_present_semaphore()},
             .swapchain = swapchain,
         });
+    }
+
+    void Editor::on_resize(u32 sx, u32 sy) {
+        //window.minimized = (sx == 0 || sy == 0);
+        //if (!window.minimized) {
+            //rendering_system->resize(sx, sy);
+            swapchain.resize();
+            size_x = swapchain.get_surface_extent().x;
+            size_y = swapchain.get_surface_extent().y;
+            window.width = static_cast<i32>(size_x);
+            window.height = static_cast<i32>(size_y);
+            render();
+        //}
     }
 }
