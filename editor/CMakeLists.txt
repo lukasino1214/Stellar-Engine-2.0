@@ -8,6 +8,8 @@ add_executable(${PROJECT_NAME}
     "panel/scene_hiearchy_panel.cpp" 
     "panel/toolbar_panel.cpp" 
     "panel/performance_stats_panel.cpp"
+    "panel/logger_panel.hpp"
+    "panel/logger_panel.cpp"
 )
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 set_project_warnings(${PROJECT_NAME})

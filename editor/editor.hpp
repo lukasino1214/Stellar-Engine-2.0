@@ -4,6 +4,7 @@
 #include "panel/performance_stats_panel.hpp"
 #include "panel/scene_hiearchy_panel.hpp"
 #include "panel/toolbar_panel.hpp"
+#include "panel/logger_panel.hpp"
 
 #include <daxa/daxa.hpp>
 #include <daxa/utils/pipeline_manager.hpp>
@@ -42,6 +43,7 @@ namespace Stellar {
         std::unique_ptr<AssetBrowserPanel> asset_browser_panel;
         std::unique_ptr<ToolbarPanel> toolbar_panel;
         std::unique_ptr<PerformanceStatsPanel> performance_stats_panel;
+        std::unique_ptr<ImGuiConsole> logger_panel;
 
         u32 FPS = 0;
         f32 deltaTime = 0;

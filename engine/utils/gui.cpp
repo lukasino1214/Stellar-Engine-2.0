@@ -204,7 +204,7 @@ namespace Stellar {
 
             if (!can_drag) {
                 std::array<char, 64> buf = {};
-                ImGui::DataTypeFormatString(buf.data(), sizeof(buf), data_type, value, localFormat);
+                ImGui::DataTypeFormatString(buf.data(), buf.size(), data_type, value, localFormat);
 
 
                 flags |= ImGuiInputTextFlags_AutoSelectAll | ImGuiInputTextFlags_NoMarkEdited; // We call MarkItemEdited() ourselves by comparing the actual data rather than the string.
@@ -216,7 +216,7 @@ namespace Stellar {
                     ImGui::BeginGroup(); // The only purpose of the group here is to allow the caller to query item data e.g. IsItemActive()
                     ImGui::PushID(label_ID);
                     ImGui::SetNextItemWidth(ImMax(1.0f, ImGui::CalcItemWidth() - (button_size + style.ItemInnerSpacing.x) * 2));
-                    if (ImGui::InputText("", buf.data(), sizeof(buf), flags)) {
+                    if (ImGui::InputText("", buf.data(), buf.size(), flags)) {
                         value_changed = ImGui::DataTypeApplyFromText(buf.data(), data_type, value, localFormat);
                     }
                     IMGUI_TEST_ENGINE_ITEM_INFO(g.LastItemData.ID, label, g.LastItemData.StatusFlags);
@@ -252,7 +252,7 @@ namespace Stellar {
                     ImGui::EndGroup();
                 }
                 else {
-                    if (ImGui::InputText(label_ID, buf.data(), sizeof(buf), flags)) {
+                    if (ImGui::InputText(label_ID, buf.data(), buf.size(), flags)) {
                         value_changed = ImGui::DataTypeApplyFromText(buf.data(), data_type, value, localFormat);
                     }
                 }
@@ -326,7 +326,7 @@ namespace Stellar {
 
                 // Display value using user-provided display format so user can add prefix/suffix/decorations to the value.
                 std::array<char, 64> value_buf = {};
-                const char* value_buf_end = value_buf.data() + ImGui::DataTypeFormatString(value_buf.data(), sizeof(value_buf), data_type, value, localFormat);
+                const char* value_buf_end = value_buf.data() + ImGui::DataTypeFormatString(value_buf.data(), value_buf.size(), data_type, value, localFormat);
                 if (g.LogEnabled) {
                     ImGui::LogSetNextTextDecoration("{", "}");
                 }
@@ -366,7 +366,7 @@ namespace Stellar {
         auto string_input(const char* label_ID, std::string &value, const ImGuiInputTextFlags input_flags) -> bool {
             std::memset(&buffer, 0, sizeof(buffer));
             std::memcpy(&buffer, value.c_str(), sizeof(buffer));
-            bool modified =  ImGui::InputText("##Tag", buffer.data(), sizeof(buffer));
+            bool modified =  ImGui::InputText("##Tag", buffer.data(), buffer.size());
             if(modified) { value = std::string(buffer.data()); }
             return modified;
         }

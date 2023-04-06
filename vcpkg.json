@@ -30,7 +30,8 @@
     "stb",
     "entt",
     "yaml-cpp",
-    "spdlog"
+    "spdlog",
+    "fmt"
   ],
   "vcpkg-configuration": {
     "overlay-ports": [

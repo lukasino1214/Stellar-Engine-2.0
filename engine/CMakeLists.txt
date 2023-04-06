@@ -6,6 +6,7 @@ project(Engine)
 
 add_library(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE 
+    "core/logger.cpp" 
     "core/types.cpp" 
     "core/uuid.cpp" 
     "core/window.cpp" 
@@ -41,6 +42,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE yaml-cpp)
 
 find_package(spdlog CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog spdlog::spdlog_header_only)
+
+find_package(fmt CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt-header-only)
 
 target_include_directories(
     ${PROJECT_NAME}

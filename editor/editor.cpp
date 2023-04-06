@@ -14,6 +14,7 @@
 
 #include <data/scene.hpp>
 #include <data/entity.hpp>
+#include <core/logger.hpp>
 
 namespace Stellar {
     Editor::Editor(Context&& _context, Window&& _window, daxa::Swapchain&& _swapchain, const std::string_view& project_path) : context{_context}, window{_window}, swapchain{_swapchain} {
@@ -57,6 +58,7 @@ namespace Stellar {
         asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
         toolbar_panel = std::make_unique<ToolbarPanel>();
         performance_stats_panel = std::make_unique<PerformanceStatsPanel>();
+        logger_panel = std::make_unique<ImGuiConsole>();
 
         glfwSetWindowUserPointer(window.glfw_window_ptr, this);
         glfwSetFramebufferSizeCallback(window.glfw_window_ptr, [](GLFWwindow * window_ptr, i32 w, i32 h) {
@@ -66,6 +68,9 @@ namespace Stellar {
 
         size_x = swapchain.get_surface_extent().x;
         size_y = swapchain.get_surface_extent().y;
+
+        Logger::init();
+        CORE_INFO("Test");
     }
 
     Editor::~Editor() {
@@ -123,6 +128,8 @@ namespace Stellar {
         asset_browser_panel->draw();
         toolbar_panel->draw();
         performance_stats_panel->draw();
+        bool open = true;
+        logger_panel->draw("Logger Panel", &open);
 
         ImGui::Begin("Viewport");
         ImGui::End();
