@@ -6,7 +6,7 @@
 #include <cstring>
 
 namespace Stellar {
-    Texture::Texture(daxa::Device _device, const std::string& path) : device{_device} {
+    Texture::Texture(daxa::Device _device, const std::string_view& _path) : device{_device}, path{_path} {
         i32 size_x = 0;
         i32 size_y = 0;
         i32 num_channels = 0;

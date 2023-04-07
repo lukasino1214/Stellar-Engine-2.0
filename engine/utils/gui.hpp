@@ -33,6 +33,7 @@ namespace Stellar {
 
         auto string_property(const char* label, std::string &value, const char* tooltip = nullptr, ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_None) -> bool;
         auto u64_property(const char* label, u64 &value, const char* tooltip = nullptr, ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_None) -> bool;
+        auto f32_property(const char* label, f32 &value, const char* tooltip = nullptr, ImGuiInputTextFlags input_flags = ImGuiInputTextFlags_None) -> bool;
         auto vec3_property(const char* label, glm::vec3 &value, const f32 *reset_values, const char** tooltips = nullptr) -> bool;
     }
 }

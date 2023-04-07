@@ -3,7 +3,11 @@
 #include <string_view>
 #include <utils/gui.hpp>
 
+#include <iostream>
+
 namespace Stellar {
+    ToolbarPanel::ToolbarPanel(const std::shared_ptr<Window>& _window) : window{_window} {}
+
     void ToolbarPanel::draw() {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 2));
         ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
@@ -21,12 +25,12 @@ namespace Stellar {
         float size = ImGui::GetWindowHeight() - 4.0f;
         ImGui::SetCursorPosX((ImGui::GetWindowContentRegionMax().x * 0.5f) - (size * 0.5f));
 
-        bool hasPlayButton = scene_state == SceneState::Edit || scene_state == SceneState::Play;
+        /*bool hasPlayButton = scene_state == SceneState::Edit || scene_state == SceneState::Play;
         bool hasSimulateButton = scene_state == SceneState::Edit || scene_state == SceneState::Simulate;
-        bool hasPauseButton = scene_state != SceneState::Edit;
+        bool hasPauseButton = scene_state != SceneState::Edit;*/
 
-        if (hasPlayButton) {
-            std::string_view action = (scene_state == SceneState::Edit || scene_state == SceneState::Simulate) ? "play" : "stop";
+        /*if (hasPlayButton) {
+            std::string_view action = (scene_state == SceneState::Edit) ? "play" : "stop";
             if (ImGui::Button(action.data(), ImVec2(size * 2.5f, size)) && toolbarEnabled) {
                 if (scene_state == SceneState::Edit || scene_state == SceneState::Simulate) {
                     play = true;
@@ -35,9 +39,23 @@ namespace Stellar {
                     play = false;
                 }
             }
+        }*/
+
+        if(scene_state == SceneState::Edit) {
+            if (ImGui::Button("play", ImVec2(size * 2.5f, size))) {
+                scene_state = SceneState::Play;
+                window->set_mouse_capture(true);
+            }
         }
 
-        if (hasSimulateButton) {
+        if(scene_state == SceneState::Play) {
+            if (ImGui::Button("edit", ImVec2(size * 2.5f, size))) {
+                scene_state = SceneState::Edit;
+                window->set_mouse_capture(false);
+            }
+        }
+
+        /*if (hasSimulateButton) {
             if (hasPlayButton)
                 ImGui::SameLine();
 
@@ -67,7 +85,7 @@ namespace Stellar {
                     if (ImGui::Button("unpause", ImVec2(size * 2.5f, size)) && toolbarEnabled) {}
                 }
             }
-        }
+        }*/
         ImGui::PopStyleVar(2);
         ImGui::PopStyleColor(3);
         ImGui::End();

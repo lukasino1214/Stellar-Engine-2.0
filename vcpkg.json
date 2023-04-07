@@ -31,7 +31,8 @@
     "entt",
     "yaml-cpp",
     "spdlog",
-    "fmt"
+    "fmt",
+    "assimp"
   ],
   "vcpkg-configuration": {
     "overlay-ports": [

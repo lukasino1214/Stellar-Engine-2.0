@@ -10,6 +10,8 @@
 #include <stdexcept>
 #include <string_view>
 
+#include <GLFW/glfw3.h>
+
 #include <graphics/texture.hpp>
 #include <core/window.hpp>
 
@@ -101,9 +103,9 @@ auto loading_screen(Stellar::Context& context, daxa::Swapchain swapchain) -> boo
     return true;
 }
 
-auto project_selection(Stellar::Context& context, Stellar::Window& window, daxa::Swapchain swapchain) -> std::string_view {
+auto project_selection(Stellar::Context& context, std::shared_ptr<Stellar::Window>& window, daxa::Swapchain swapchain) -> std::string_view {
     ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForVulkan(window.glfw_window_ptr, true);
+    ImGui_ImplGlfw_InitForVulkan(window->glfw_window_ptr, true);
     daxa::ImGuiRenderer imgui_renderer =  daxa::ImGuiRenderer({
         .device = context.device,
         .format = swapchain.get_format(),
@@ -111,7 +113,7 @@ auto project_selection(Stellar::Context& context, Stellar::Window& window, daxa:
 
     ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-    while(!window.should_close()) {
+    while(!window->should_close()) {
         glfwPollEvents();
 
         ImGui_ImplGlfw_NewFrame();
@@ -232,26 +234,26 @@ auto main() -> i32 {
         .debug_name = "pipeline_manager",
     });
 
-    Stellar::Window window(520, 220, "Projection selection");
+    std::shared_ptr<Stellar::Window> window = std::make_shared<Stellar::Window>(520, 220, "Projection selection");
 
     daxa::Swapchain swapchain = context.device.create_swapchain({
-        .native_window = window.get_native_handle(),
-        .native_window_platform = window.get_native_platform(),
+        .native_window = window->get_native_handle(),
+        .native_window_platform = window->get_native_platform(),
         .present_mode = daxa::PresentMode::IMMEDIATE,
         .image_usage = daxa::ImageUsageFlagBits::TRANSFER_DST,
         .debug_name = "swapchain"
     });
 
-    window.toggle_border(false);
+    window->toggle_border(false);
 
     std::this_thread::sleep_for(50ms);
 
     bool loaded_sucessfully = loading_screen(context, swapchain);
     if(!loaded_sucessfully) { throw std::runtime_error("Loading project selection failed"); }
 
-    window.toggle_border(true);
-    window.set_size(800, 600);
-    window.set_position(1920 + 1920 / 2 - window.width / 2, 1080 / 2 - window.height / 2);
+    window->toggle_border(true);
+    window->set_size(800, 600);
+    window->set_position(1920 + 1920 / 2 - window->width / 2, 1080 / 2 - window->height / 2);
     swapchain.resize();
 
     std::this_thread::sleep_for(50ms);
@@ -262,9 +264,9 @@ auto main() -> i32 {
     std::string_view project_path = project_selection(context, window, swapchain);
     if(project_path.empty()) { throw std::runtime_error("Loading project failed"); }
 
-    window.toggle_border(false);
-    window.set_size(520, 220);
-    window.set_position(1920 + 1920 / 2 - window.width / 2, 1080 / 2 - window.height / 2);
+    window->toggle_border(false);
+    window->set_size(520, 220);
+    window->set_position(1920 + 1920 / 2 - window->width / 2, 1080 / 2 - window->height / 2);
     swapchain.resize();
 
     std::this_thread::sleep_for(50ms);

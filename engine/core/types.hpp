@@ -7,6 +7,9 @@
 #include <string>
 #include <memory>
 
+#define GLM_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
+
 namespace Stellar {
     inline namespace Types {
         using u8 = std::uint8_t;

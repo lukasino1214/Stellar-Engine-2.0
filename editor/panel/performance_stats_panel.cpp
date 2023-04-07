@@ -6,7 +6,7 @@ namespace Stellar {
     void PerformanceStatsPanel::draw() {
         ImGui::Begin("Performance Stats");
 
-        ImGui::Text("Frame Time: %f", static_cast<f64>(delta_time * 1000.0f));
+        ImGui::Text("Frame Time: %f ms", static_cast<f64>(delta_time * 1000.0f));
 
         static constexpr u32 SAMPLE_COUNT = 200;
         static constexpr u32 REFRESH_RATE = 60;
@@ -28,7 +28,7 @@ namespace Stellar {
         average_draw_time /= static_cast<f32>(SAMPLE_COUNT);
 
         std::array<char, 32> draw_time_overlay = {};
-        snprintf(draw_time_overlay.data(), 32, "Average: %f", static_cast<f64>(average_draw_time));
+        snprintf(draw_time_overlay.data(), 32, "Average: %f ms", static_cast<f64>(average_draw_time));
         ImGui::SetNextItemWidth(ImGui::GetWindowContentRegionWidth());
         ImGui::PlotLines("Lines", draw_time_samples.data(), SAMPLE_COUNT, static_cast<i32>(current_sample_index), draw_time_overlay.data(), 0.0f, 100.0f, ImVec2(0, 80.0f));
 

@@ -1,27 +1,27 @@
 Scene: Test
 Entities:
-  - Entity: 15442142338929989254
+  - Entity: 16300283054218962531
     TagComponent:
       Tag: lol
     RelationshipComponent:
-      Parent: 4162147861001596377
+      Parent: 14308949813795185425
       Children:
         []
-  - Entity: 8154790699504598301
+  - Entity: 245181788873058078
     TagComponent:
       Tag: test
     RelationshipComponent:
-      Parent: 4162147861001596377
+      Parent: 14308949813795185425
       Children:
         []
-  - Entity: 4162147861001596377
+  - Entity: 14308949813795185425
     TagComponent:
       Tag: pog
     RelationshipComponent:
       Parent: 0
       Children:
-        - 8154790699504598301
-        - 15442142338929989254
+        - 245181788873058078
+        - 16300283054218962531
     TransformComponent:
       Position: [1, 2, 3]
       Rotation: [80, 60, 20]

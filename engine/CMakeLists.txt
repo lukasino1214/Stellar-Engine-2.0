@@ -15,6 +15,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     "data/entity.cpp"
     "data/components.cpp"
     "graphics/texture.cpp"
+    "graphics/camera.cpp"
+    "graphics/model.cpp"
     "utils/utils.hpp"
     "utils/utils.cpp"
     "utils/gui.hpp"
@@ -45,6 +47,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog spdlog::spdlog_head
 
 find_package(fmt CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt-header-only)
+
+find_package(assimp CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
 
 target_include_directories(
     ${PROJECT_NAME}

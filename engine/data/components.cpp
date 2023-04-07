@@ -40,4 +40,13 @@ namespace Stellar {
 
         GUI::end_properties();
     }
+
+    void CameraComponent::draw() {
+        GUI::begin_properties();
+        if(GUI::f32_property("FOV:", camera.fov, nullptr, ImGuiInputTextFlags_None)) { is_dirty = true; }
+        if(GUI::f32_property("Aspect:", camera.aspect, nullptr, ImGuiInputTextFlags_None)) { is_dirty = true; }
+        if(GUI::f32_property("Near Plane:", camera.near_clip, nullptr, ImGuiInputTextFlags_None)) { is_dirty = true; }
+        if(GUI::f32_property("Far Plane:", camera.far_clip, nullptr, ImGuiInputTextFlags_None)) { is_dirty = true; }
+        GUI::end_properties();
+    }
 }

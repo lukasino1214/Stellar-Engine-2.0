@@ -17,6 +17,8 @@ namespace Stellar {
 
         void set_size(i32 x, i32 y);
         void set_position(i32 x, i32 y);
+        void set_mouse_position(i32 x, i32 y);
+        void set_mouse_capture(bool should_capture);
         void set_name(const std::string_view& _name);
 
         void toggle_border(bool value);

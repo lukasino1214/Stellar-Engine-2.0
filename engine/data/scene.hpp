@@ -18,7 +18,7 @@ namespace Stellar {
         auto create_entity(const std::string_view& _name) -> Entity;
         auto create_entity_with_UUID(const std::string_view& _name, UUID _uuid) -> Entity;
 
-        void destroy_entity(Entity entity) const;
+        void destroy_entity(const Entity& entity);
 
         void iterate(std::function<void(Entity)> fn);
 
@@ -26,6 +26,8 @@ namespace Stellar {
         void deserialize(const std::string_view& path);
 
         void reset();
+
+        void update();
 
         std::string name;
         std::unique_ptr<entt::registry> registry;

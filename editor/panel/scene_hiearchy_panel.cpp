@@ -8,6 +8,8 @@
 
 #include <utils/gui.hpp>
 
+#include <iostream>
+
 namespace Stellar {
     template<typename T>
     inline void draw_component(Entity entity, const std::string_view& component_name) {
@@ -49,6 +51,15 @@ namespace Stellar {
         }
     }
 
+    template<typename T>
+    inline void add_new_component(Entity entity, const std::string_view& component_name) {
+        if(!entity.has_component<T>()) {
+            if (ImGui::MenuItem(component_name.data())) {
+                entity.add_component<T>();
+            }
+        }
+    }
+
     SceneHiearchyPanel::SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene) : scene{_scene} {}
 
     void SceneHiearchyPanel::tree(Entity& entity, const RelationshipComponent &relationship_component, const u32 iteration) {
@@ -70,6 +81,24 @@ namespace Stellar {
             selected_entity = entity;
         }
 
+        bool entity_deleted = false;
+		if (ImGui::BeginPopupContextItem()) {
+            if (ImGui::MenuItem("Create Children Entity")) {
+                Entity created_entity = scene->create_entity("Empty Entity");
+
+                if(selected_entity) {
+                    selected_entity.get_component<RelationshipComponent>().children.push_back(created_entity);
+                    created_entity.get_component<RelationshipComponent>().parent = selected_entity;
+                }
+            }
+
+			if (ImGui::MenuItem("Delete Entity")) {
+				entity_deleted = true;
+            }
+
+			ImGui::EndPopup();
+		}
+
         if (selected) {
             ImGui::PopStyleColor(2);
         }
@@ -84,6 +113,13 @@ namespace Stellar {
             ImGui::TreePop();
         }
 
+        if (entity_deleted) {
+			scene->destroy_entity(entity);
+			if (selected_entity == entity) {
+				selected_entity = {};
+            }
+		}
+
 
         if(iteration == 0) { ImGui::Separator(); }
     }
@@ -97,6 +133,23 @@ namespace Stellar {
                 tree(entity, rc, 0);
             }
         });
+
+        if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
+            selected_entity = {};
+
+        // Right-click on blank space
+        if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
+            if (ImGui::MenuItem("Create Empty Entity")) {
+                Entity created_entity = scene->create_entity("Empty Entity");
+
+                if(selected_entity) {
+                    selected_entity.get_component<RelationshipComponent>().children.push_back(created_entity);
+                    created_entity.get_component<RelationshipComponent>().parent = selected_entity;
+                }
+            }
+
+            ImGui::EndPopup();
+        }
 
         ImGui::End();
 
@@ -113,6 +166,17 @@ namespace Stellar {
 
             if(selected_entity.has_component<TransformComponent>()) {
                 draw_component<TransformComponent>(selected_entity, "Transform Component");
+            }
+
+            if(selected_entity.has_component<CameraComponent>()) {
+                draw_component<CameraComponent>(selected_entity, "Camera Component");
+            }
+
+            if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
+                add_new_component<TransformComponent>(selected_entity, "Add Transform Component");
+                add_new_component<CameraComponent>(selected_entity, "Add Camera Component");
+
+                ImGui::EndPopup();
             }
         }
 

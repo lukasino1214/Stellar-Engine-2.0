@@ -91,15 +91,20 @@ namespace Stellar {
         return entity;
     }
 
-    void Scene::destroy_entity(Entity entity) const {
+    void Scene::destroy_entity(const Entity& entity) {
+        const auto& rc = entity.get_component<RelationshipComponent>();
+        for(auto _children : rc.children) {
+            destroy_entity(Entity { _children, this });
+        }
+
         registry->destroy(entity.handle);
     }
 
     void Scene::iterate(std::function<void(Entity)> fn) {
         registry->each([&](auto entity_handle) {
             Entity entity = {entity_handle, this};
-            if (!entity)
-                return;
+            if (!entity) { return; }
+            if(!entity.has_component<TagComponent>()) { return; } // stupid fix I have no idea why its happening
 
             fn(entity);
         });
@@ -164,6 +169,19 @@ namespace Stellar {
                 out << YAML::EndMap;
             }
 
+            if(entity.has_component<CameraComponent>()) {
+                out << YAML::Key << "CameraComponent";
+                out << YAML::BeginMap;
+
+                auto& cc = entity.get_component<CameraComponent>();
+                out << YAML::Key << "FOV" << YAML::Value << cc.camera.fov;
+                out << YAML::Key << "Aspect" << YAML::Value << cc.camera.aspect;
+                out << YAML::Key << "NearPlane" << YAML::Value << cc.camera.near_clip;
+                out << YAML::Key << "FarPlane" << YAML::Value << cc.camera.far_clip;
+
+                out << YAML::EndMap;
+            }
+
             out << YAML::EndMap;
 		});
 
@@ -197,6 +215,16 @@ namespace Stellar {
                 tc.rotation = transform_component["Rotation"].as<glm::vec3>();
                 tc.scale = transform_component["Scale"].as<glm::vec3>();
                 tc.is_dirty = true;
+            }
+
+            auto camera_component = entity["CameraComponent"];
+            if (camera_component) {
+                auto &cc = deserialized_entity.add_component<CameraComponent>();
+                cc.camera.fov = camera_component["FOV"].as<f32>();
+                cc.camera.aspect = camera_component["Aspect"].as<f32>();
+                cc.camera.near_clip = camera_component["NearPlane"].as<f32>();
+                cc.camera.far_clip = camera_component["FarPlane"].as<f32>();
+                cc.is_dirty = true;
             }
         }
 
@@ -242,5 +270,11 @@ namespace Stellar {
     void Scene::reset() {
         // TODO: add reset function later flecs::world().reset()
         registry = std::make_unique<entt::registry>();
+    }
+
+    void Scene::update() {
+        iterate([](Entity entity){
+            entity.update();
+        });
     }
 }

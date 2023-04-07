@@ -45,6 +45,16 @@ namespace Stellar {
         glfwSetWindowPos(glfw_window_ptr, x, y);
     }
 
+    void Window::set_mouse_position(i32 x, i32 y) {
+        glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(x), static_cast<f64>(y));
+    }
+
+    void Window::set_mouse_capture(bool should_capture) {
+        glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2), static_cast<f64>(height / 2));
+        glfwSetInputMode(glfw_window_ptr, GLFW_CURSOR, should_capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
+        glfwSetInputMode(glfw_window_ptr, GLFW_RAW_MOUSE_MOTION, should_capture);
+    }
+
     void Window::set_name(const std::string_view &_name) {
         glfwSetWindowTitle(glfw_window_ptr, _name.data());
         name = _name;

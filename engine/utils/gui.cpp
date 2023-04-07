@@ -363,6 +363,15 @@ namespace Stellar {
             return modified;
         }
 
+        auto f32_property(const char* label, f32 &value, const char* tooltip, const ImGuiInputTextFlags input_flags) -> bool {
+            begin_property(label);
+            bool modified = numeric_input<f32>(IDBuffer.data(), value, true, false, ImDrawFlags_RoundCornersAll, GImGui->Style.FrameRounding, input_flags);
+            show_tooltip(tooltip);
+            end_property();
+
+            return modified;
+        }
+
         auto string_input(const char* label_ID, std::string &value, const ImGuiInputTextFlags input_flags) -> bool {
             std::memset(&buffer, 0, sizeof(buffer));
             std::memcpy(&buffer, value.c_str(), sizeof(buffer));

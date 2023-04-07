@@ -1,11 +1,16 @@
 #include "editor.hpp"
 #include "core/types.hpp"
 #include "data/components.hpp"
+#include "graphics/model.hpp"
 #include "panel/asset_browser_panel.hpp"
 #include "panel/performance_stats_panel.hpp"
 #include "panel/scene_hiearchy_panel.hpp"
 #include "panel/toolbar_panel.hpp"
 
+#include <daxa/types.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/trigonometric.hpp>
 #include <memory>
 #include <thread>
 
@@ -16,12 +21,14 @@
 #include <data/entity.hpp>
 #include <core/logger.hpp>
 
+#include "../shaders/shared.inl"
+
 namespace Stellar {
-    Editor::Editor(Context&& _context, Window&& _window, daxa::Swapchain&& _swapchain, const std::string_view& project_path) : context{_context}, window{_window}, swapchain{_swapchain} {
-        window.toggle_border(true);
-        window.set_size(1200, 720);
-        window.set_position(1920 + 1920 / 2 - window.width / 2, 1080 / 2 - window.height / 2);
-        window.set_name(std::string{"Stellar Editor - "} + std::string{project_path});
+    Editor::Editor(Context&& _context, std::shared_ptr<Stellar::Window>&& _window, daxa::Swapchain&& _swapchain, const std::string_view& project_path) : context{_context}, window{_window}, swapchain{_swapchain} {
+        window->toggle_border(true);
+        window->set_size(1200, 720);
+        window->set_position(1920 + 1920 / 2 - window->width / 2, 1080 / 2 - window->height / 2);
+        window->set_name(std::string{"Stellar Editor - "} + std::string{project_path});
         swapchain.resize();
 
         using namespace std::literals;
@@ -29,16 +36,8 @@ namespace Stellar {
 
         swapchain.resize();
         swapchain.resize();
-
-        ImGui_ImplGlfw_InitForVulkan(window.glfw_window_ptr, true);
-        imgui_renderer =  daxa::ImGuiRenderer({
-            .device = context.device,
-            .format = swapchain.get_format(),
-        });
-
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         
-        std::shared_ptr<Scene> scene = std::make_shared<Scene>("Test");
+        scene = std::make_shared<Scene>("Test");
         auto e = scene->create_entity("pog");
         auto& tc = e.add_component<TransformComponent>();
         tc.position = { 1.0f, 2.0f, 3.0f };
@@ -56,21 +55,141 @@ namespace Stellar {
 
         scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene);
         asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
-        toolbar_panel = std::make_unique<ToolbarPanel>();
+        toolbar_panel = std::make_unique<ToolbarPanel>(window);
         performance_stats_panel = std::make_unique<PerformanceStatsPanel>();
         logger_panel = std::make_unique<ImGuiConsole>();
 
-        glfwSetWindowUserPointer(window.glfw_window_ptr, this);
-        glfwSetFramebufferSizeCallback(window.glfw_window_ptr, [](GLFWwindow * window_ptr, i32 w, i32 h) {
+        glfwSetWindowUserPointer(window->glfw_window_ptr, this);
+        glfwSetFramebufferSizeCallback(window->glfw_window_ptr, [](GLFWwindow * window_ptr, i32 w, i32 h) {
             auto& app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
             app.on_resize(static_cast<u32>(w), static_cast<u32>(h));
         });
+        glfwSetCursorPosCallback(window->glfw_window_ptr, [](GLFWwindow * window_ptr, f64 x, f64 y) {
+            auto & app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
+            app.on_mouse_move(static_cast<f32>(x), static_cast<f32>(y));
+        });
+        glfwSetKeyCallback(window->glfw_window_ptr, [](GLFWwindow * window_ptr, i32 key, i32, i32 action, i32) {
+            auto & app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
+            app.on_key(key, action);
+        });
+
+        ImGui_ImplGlfw_InitForVulkan(window->glfw_window_ptr, true);
+        imgui_renderer =  daxa::ImGuiRenderer({
+            .device = context.device,
+            .format = swapchain.get_format(),
+        });
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
         size_x = swapchain.get_surface_extent().x;
         size_y = swapchain.get_surface_extent().y;
 
         Logger::init();
         CORE_INFO("Test");
+
+        render_image = context.device.create_image({
+            .format = daxa::Format::R8G8B8A8_UNORM,
+            .aspect = daxa::ImageAspectFlagBits::COLOR,
+            .size = { size_x, size_y, 1 },
+            .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .debug_name = "render_image"
+        });
+
+        depth_image = context.device.create_image({
+            .format = daxa::Format::D32_SFLOAT,
+            .aspect = daxa::ImageAspectFlagBits::DEPTH,
+            .size = { size_x, size_y, 1 },
+            .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .debug_name = "depth_image"
+        });
+
+        depth_prepass_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"depth_prepass.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"depth_prepass.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::FRONT_BIT
+            },
+            .push_constant_size = sizeof(DepthPrepassPush),
+            .debug_name = "raster_pipeline",
+        }).value();
+
+        raster_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"draw.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"draw.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_UNORM }},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_test = true,
+                .enable_depth_write = false,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::FRONT_BIT
+            },
+            .push_constant_size = sizeof(DrawPush),
+            .debug_name = "raster_pipeline",
+        }).value();
+
+        vertex_buffer = context.device.create_buffer({
+            .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+            .size = 36 * sizeof(_Vertex),
+        });
+
+        f32 vertices[] = {
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+        };
+
+        auto* vertex_buffer_ptr = context.device.get_host_address_as<_Vertex>(vertex_buffer);
+        std::memcpy(vertex_buffer_ptr, vertices, sizeof(vertices));
+
+        editor_camera.camera.resize(size_x, size_y);
+
+        model = std::make_unique<Model>(context.device, "models/Sponza/Sponza.gltf");
     }
 
     Editor::~Editor() {
@@ -78,10 +197,13 @@ namespace Stellar {
 
         context.device.wait_idle();
         context.device.collect_garbage();
+        context.device.destroy_image(render_image);
+        context.device.destroy_image(depth_image);
+        context.device.destroy_buffer(vertex_buffer);
     }
 
     void Editor::run() {
-        while(!window.should_close()) {
+        while(!window->should_close()) {
             glfwPollEvents();
 
             ui_update();
@@ -127,21 +249,126 @@ namespace Stellar {
         scene_hiearchy_panel->draw();
         asset_browser_panel->draw();
         toolbar_panel->draw();
+
         performance_stats_panel->draw();
         bool open = true;
         logger_panel->draw("Logger Panel", &open);
 
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::Begin("Viewport");
+        ImGui::Image(*reinterpret_cast<ImTextureID const *>(&render_image), ImGui::GetContentRegionAvail(), ImVec2 {});
         ImGui::End();
+        ImGui::PopStyleVar();
 
         ImGui::Render();
     }
 
     void Editor::render() {
+        scene->update();
+
         daxa::ImageId swapchain_image = swapchain.acquire_next_image();
         if(swapchain_image.is_empty()) { return; }
 
         daxa::CommandList cmd_list = context.device.create_command_list({ .debug_name = "main loop cmd list" });
+
+        glm::mat4 model_mat = glm::translate(glm::mat4{1.0}, glm::vec3{0.0f});
+
+        editor_camera.camera.set_pos(editor_camera.position);
+        editor_camera.camera.set_rot(editor_camera.rotation.x, editor_camera.rotation.y);
+        editor_camera.update(deltaTime);
+        //std::cout << glm::degrees(editor_camera.rotation.x) << " " << glm::degrees(editor_camera.rotation.y) << std::endl;
+
+        glm::mat4 projection = editor_camera.camera.get_projection();
+        glm::mat4 view = editor_camera.camera.get_view();
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = render_image
+        });
+
+
+        cmd_list.begin_renderpass({
+            .depth_attachment = {{
+                .image_view = depth_image.default_view(),
+                .load_op = daxa::AttachmentLoadOp::CLEAR,
+                .clear_value = daxa::DepthValue{1.0f, 0},
+            }},
+            .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+        });
+ 
+        cmd_list.set_pipeline(*depth_prepass_pipeline);
+
+        glm::mat4x4 mvp = projection * view * model_mat;
+
+        /*cmd_list.push_constant(DrawPush {
+            .mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp),
+            .vertex_buffer = context.device.get_device_address(model->face_buffer)
+        });*/
+
+        {
+            DepthPrepassPush draw_push;
+            draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+            model->draw(cmd_list, draw_push);
+        }
+
+        cmd_list.end_renderpass();
+
+
+
+        /*cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = render_image
+        });*/
+
+        /*cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
+            .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+            .image_id = depth_image,
+        });*/
+
+        cmd_list.begin_renderpass({
+            .color_attachments = {{
+                .image_view = render_image.default_view(),
+                .load_op = daxa::AttachmentLoadOp::CLEAR,
+                .clear_value = std::array<daxa::f32, 4>{0.2f, 0.4f, 1.0f, 1.0f},
+            }},
+            .depth_attachment = {{
+                .image_view = depth_image.default_view(),
+                .load_op = daxa::AttachmentLoadOp::LOAD,
+                .clear_value = daxa::DepthValue{1.0f, 0},
+            }},
+            .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+        });
+ 
+        cmd_list.set_pipeline(*raster_pipeline);
+
+        /*cmd_list.push_constant(DrawPush {
+            .mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp),
+            .vertex_buffer = context.device.get_device_address(model->face_buffer)
+        });*/
+
+        DrawPush draw_push;
+        draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+        model->draw(cmd_list, draw_push);
+
+        cmd_list.end_renderpass();
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .after_layout = daxa::ImageLayout::READ_ONLY_OPTIMAL,
+            .image_id = render_image
+        });
+
+
+
+
 
         cmd_list.pipeline_barrier_image_transition({
             .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
@@ -187,9 +414,32 @@ namespace Stellar {
             swapchain.resize();
             size_x = swapchain.get_surface_extent().x;
             size_y = swapchain.get_surface_extent().y;
-            window.width = static_cast<i32>(size_x);
-            window.height = static_cast<i32>(size_y);
+            window->width = static_cast<i32>(size_x);
+            window->height = static_cast<i32>(size_y);
             render();
         //}
+    }
+
+    void Editor::on_key(i32 key, i32 action) {
+        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+            if(toolbar_panel->scene_state == SceneState::Play) {
+                window->set_mouse_capture(false);
+            }
+            toolbar_panel->scene_state = SceneState::Edit;
+        }
+
+        if (toolbar_panel->scene_state == SceneState::Play) {
+            editor_camera.on_key(key, action);
+        }
+    }
+
+    void Editor::on_mouse_move(f32 x, f32 y) {
+        if (toolbar_panel->scene_state == SceneState::Play) {
+            f32 center_x = static_cast<f32>(size_x / 2);
+            f32 center_y = static_cast<f32>(size_y / 2);
+            auto offset = glm::vec2{x - center_x, center_y - y};
+            editor_camera.on_mouse_move(offset.x, offset.y);
+            window->set_mouse_position(center_x, center_y);
+        }
     }
 }
