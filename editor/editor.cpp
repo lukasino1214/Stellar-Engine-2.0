@@ -1,17 +1,11 @@
 #include "editor.hpp"
-#include "core/types.hpp"
-#include "data/components.hpp"
-#include "graphics/model.hpp"
-#include "panel/asset_browser_panel.hpp"
-#include "panel/performance_stats_panel.hpp"
-#include "panel/scene_hiearchy_panel.hpp"
-#include "panel/toolbar_panel.hpp"
+#include <core/types.hpp>
+#include <data/components.hpp>
 
 #include <daxa/types.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/trigonometric.hpp>
-#include <memory>
 #include <thread>
 
 #include <imgui.h>
@@ -37,20 +31,7 @@ namespace Stellar {
         swapchain.resize();
         swapchain.resize();
         
-        scene = std::make_shared<Scene>("Test");
-        auto e = scene->create_entity("pog");
-        auto& tc = e.add_component<TransformComponent>();
-        tc.position = { 1.0f, 2.0f, 3.0f };
-        tc.rotation = { 80.0f, 60.0f, 20.0f };
-
-        auto e1 = scene->create_entity("test");
-        auto e2 = scene->create_entity("lol");
-
-        e1.get_component<RelationshipComponent>().parent = e;
-        e2.get_component<RelationshipComponent>().parent = e;
-        e.get_component<RelationshipComponent>().children = { e1, e2 };
-
-        scene->serialize("test.scene");
+        scene = std::make_shared<Scene>("Test", context.device);
         scene->deserialize("test.scene");
 
         scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene);
@@ -135,61 +116,11 @@ namespace Stellar {
             .debug_name = "raster_pipeline",
         }).value();
 
-        vertex_buffer = context.device.create_buffer({
-            .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
-            .size = 36 * sizeof(_Vertex),
-        });
-
-        f32 vertices[] = {
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-        };
-
-        auto* vertex_buffer_ptr = context.device.get_host_address_as<_Vertex>(vertex_buffer);
-        std::memcpy(vertex_buffer_ptr, vertices, sizeof(vertices));
-
         editor_camera.camera.resize(size_x, size_y);
 
-        model = std::make_unique<Model>(context.device, "models/Sponza/Sponza.gltf");
+        Entity e = scene->create_entity("Directional Light");
+        e.add_component<TransformComponent>();
+        e.add_component<DirectionalLightComponent>();
     }
 
     Editor::~Editor() {
@@ -199,7 +130,6 @@ namespace Stellar {
         context.device.collect_garbage();
         context.device.destroy_image(render_image);
         context.device.destroy_image(depth_image);
-        context.device.destroy_buffer(vertex_buffer);
     }
 
     void Editor::run() {
@@ -271,12 +201,9 @@ namespace Stellar {
 
         daxa::CommandList cmd_list = context.device.create_command_list({ .debug_name = "main loop cmd list" });
 
-        glm::mat4 model_mat = glm::translate(glm::mat4{1.0}, glm::vec3{0.0f});
-
         editor_camera.camera.set_pos(editor_camera.position);
         editor_camera.camera.set_rot(editor_camera.rotation.x, editor_camera.rotation.y);
         editor_camera.update(deltaTime);
-        //std::cout << glm::degrees(editor_camera.rotation.x) << " " << glm::degrees(editor_camera.rotation.y) << std::endl;
 
         glm::mat4 projection = editor_camera.camera.get_projection();
         glm::mat4 view = editor_camera.camera.get_view();
@@ -287,7 +214,6 @@ namespace Stellar {
             .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
             .image_id = render_image
         });
-
 
         cmd_list.begin_renderpass({
             .depth_attachment = {{
@@ -300,37 +226,21 @@ namespace Stellar {
  
         cmd_list.set_pipeline(*depth_prepass_pipeline);
 
-        glm::mat4x4 mvp = projection * view * model_mat;
+        scene->iterate([&](Entity entity){
+            if(entity.has_component<ModelComponent>()) {
+                auto& tc = entity.get_component<TransformComponent>();
+                auto& mc = entity.get_component<ModelComponent>();
 
-        /*cmd_list.push_constant(DrawPush {
-            .mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp),
-            .vertex_buffer = context.device.get_device_address(model->face_buffer)
-        });*/
+                glm::mat4x4 mvp = projection * view;
 
-        {
-            DepthPrepassPush draw_push;
-            draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
-            model->draw(cmd_list, draw_push);
-        }
+                DepthPrepassPush draw_push;
+                draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+                draw_push.transform_buffer = context.device.get_device_address(tc.transform_buffer);
+                mc.model->draw(cmd_list, draw_push);
+            }
+        });
 
         cmd_list.end_renderpass();
-
-
-
-        /*cmd_list.pipeline_barrier_image_transition({
-            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
-            .before_layout = daxa::ImageLayout::UNDEFINED,
-            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
-            .image_id = render_image
-        });*/
-
-        /*cmd_list.pipeline_barrier_image_transition({
-            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
-            .before_layout = daxa::ImageLayout::UNDEFINED,
-            .after_layout = daxa::ImageLayout::TRANSFER_DST_OPTIMAL,
-            .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
-            .image_id = depth_image,
-        });*/
 
         cmd_list.begin_renderpass({
             .color_attachments = {{
@@ -348,14 +258,20 @@ namespace Stellar {
  
         cmd_list.set_pipeline(*raster_pipeline);
 
-        /*cmd_list.push_constant(DrawPush {
-            .mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp),
-            .vertex_buffer = context.device.get_device_address(model->face_buffer)
-        });*/
+        scene->iterate([&](Entity entity){
+            if(entity.has_component<ModelComponent>()) {
+                auto& tc = entity.get_component<TransformComponent>();
+                auto& mc = entity.get_component<ModelComponent>();
 
-        DrawPush draw_push;
-        draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
-        model->draw(cmd_list, draw_push);
+                glm::mat4x4 mvp = projection * view;
+
+                DrawPush draw_push;
+                draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+                draw_push.transform_buffer = context.device.get_device_address(tc.transform_buffer);
+                draw_push.light_buffer = context.device.get_device_address(scene->light_buffer);
+                mc.model->draw(cmd_list, draw_push);
+            }
+        });
 
         cmd_list.end_renderpass();
 
@@ -365,10 +281,6 @@ namespace Stellar {
             .after_layout = daxa::ImageLayout::READ_ONLY_OPTIMAL,
             .image_id = render_image
         });
-
-
-
-
 
         cmd_list.pipeline_barrier_image_transition({
             .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
@@ -416,6 +328,27 @@ namespace Stellar {
             size_y = swapchain.get_surface_extent().y;
             window->width = static_cast<i32>(size_x);
             window->height = static_cast<i32>(size_y);
+
+            context.device.destroy_image(render_image);
+            render_image = context.device.create_image({
+                .format = daxa::Format::R8G8B8A8_UNORM,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { size_x, size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "render_image"
+            });
+
+            context.device.destroy_image(depth_image);
+            depth_image = context.device.create_image({
+                .format = daxa::Format::D32_SFLOAT,
+                .aspect = daxa::ImageAspectFlagBits::DEPTH,
+                .size = { size_x, size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "depth_image"
+            });
+
             render();
         //}
     }

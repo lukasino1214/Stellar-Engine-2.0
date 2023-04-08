@@ -46,7 +46,6 @@ namespace Stellar {
 
         daxa::ImageId render_image;
         daxa::ImageId depth_image;
-        daxa::BufferId vertex_buffer;
 
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
         std::shared_ptr<daxa::RasterPipeline> raster_pipeline;
@@ -64,6 +63,5 @@ namespace Stellar {
 
         ControlledCamera3D editor_camera;
         std::shared_ptr<Scene> scene;
-        std::unique_ptr<Model> model;
     };
 }

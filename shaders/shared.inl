@@ -1,11 +1,73 @@
 #pragma once
 #include <daxa/daxa.inl>
 
+struct TextureID {
+    daxa_Image2Df32 texture_id;
+    daxa_SamplerId sampler_id;
+};
+
+struct MaterialInfo {
+    TextureID albedo_texture;
+    daxa_f32vec4 albedo_factor;
+    daxa_u32 has_albedo_texture;
+    TextureID metallic_texture;
+    daxa_f32 metallic_factor;
+    daxa_u32 has_metallic_texture;
+    TextureID roughness_texture;
+    daxa_f32 roughness_factor;
+    daxa_u32 has_roughness_texture;
+    daxa_u32 has_metallic_roughness_combined;
+    TextureID normal_map_texture;
+    daxa_u32 has_normal_map_texture;
+};
+
+DAXA_ENABLE_BUFFER_PTR(MaterialInfo)
+
+struct TransformInfo {
+    daxa_f32mat4x4 model_matrix;
+    daxa_f32mat4x4 normal_matrix;
+};
+
+DAXA_ENABLE_BUFFER_PTR(TransformInfo)
+
+struct DirectionalLight {
+    daxa_f32vec3 direction;
+    daxa_f32vec3 color;
+    daxa_f32 intensity;
+};
+
+struct PointLight {
+    daxa_f32vec3 position;
+    daxa_f32vec3 color;
+    daxa_f32 intensity;
+};
+
+struct SpotLight {
+    daxa_f32vec3 position;
+    daxa_f32vec3 direction;
+    daxa_f32vec3 color;
+    daxa_f32 intensity;
+    daxa_f32 cut_off;
+    daxa_f32 outer_cut_off;
+};
+
+#define MAX_LIGHTS 128
+struct LightBuffer {
+    DirectionalLight directional_lights[MAX_LIGHTS];
+    daxa_i32 num_directional_lights;
+    PointLight point_lights[MAX_LIGHTS];
+    daxa_i32 num_point_lights;
+    SpotLight spot_lights[MAX_LIGHTS];
+    daxa_i32 num_spot_lights;
+};
+
+DAXA_ENABLE_BUFFER_PTR(LightBuffer)
+
 struct Vertex {
     daxa_f32vec3 position;
     daxa_f32vec2 uv;
-    daxa_f32vec3 normals;
-    daxa_f32vec3 tangents;
+    daxa_f32vec3 normal;
+    daxa_f32vec3 tangent;
 };
 
 DAXA_ENABLE_BUFFER_PTR(Vertex)
@@ -25,11 +87,15 @@ struct TexturePush {
 struct DrawPush {
     daxa_f32mat4x4 mvp;
     daxa_BufferPtr(Vertex) vertex_buffer;
-    daxa_Image2Df32 texture;
-    daxa_SamplerId texture_sampler;
+    TextureID albedo_texture;
+    daxa_BufferPtr(MaterialInfo) material_buffer;
+    daxa_i32 material_index;
+    daxa_BufferPtr(TransformInfo) transform_buffer;
+    daxa_BufferPtr(LightBuffer) light_buffer;
 };
 
 struct DepthPrepassPush {
     daxa_f32mat4x4 mvp;
     daxa_BufferPtr(Vertex) vertex_buffer;
+    daxa_BufferPtr(TransformInfo) transform_buffer;
 };

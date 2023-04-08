@@ -11,6 +11,12 @@
 
 #include <fstream>
 #include <iostream>
+#include <cstring>
+
+#include "../../shaders/shared.inl"
+
+#include <glm/gtx/rotate_vector.hpp>
+
 
 namespace YAML {
     template<>
@@ -73,8 +79,27 @@ YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec4 &v) {
 }
 
 namespace Stellar {
-    Scene::Scene(const std::string_view& _name) : name{_name} {
+    Scene::Scene(const std::string_view& _name, daxa::Device _device) : name{_name}, device{_device} {
         registry = std::make_unique<entt::registry>();
+
+        light_buffer = device.create_buffer({
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .size = sizeof(LightBuffer),
+            .debug_name = "light buffer",
+        });
+    }
+
+    Scene::~Scene() {
+        iterate([&](Entity entity) {
+            if(entity.has_component<TransformComponent>()) {
+                auto& tc = entity.get_component<TransformComponent>();
+                if(!tc.transform_buffer.is_empty()) {
+                    device.destroy_buffer(tc.transform_buffer);
+                }
+            }
+        });
+
+        device.destroy_buffer(light_buffer);
     }
 
     auto Scene::create_entity(const std::string_view& _name) -> Entity {
@@ -182,6 +207,51 @@ namespace Stellar {
                 out << YAML::EndMap;
             }
 
+            if(entity.has_component<ModelComponent>()) {
+                out << YAML::Key << "ModelComponent";
+                out << YAML::BeginMap;
+
+                auto& mc = entity.get_component<ModelComponent>();
+                out << YAML::Key << "Filepath" << YAML::Value << mc.model->file_path;
+
+                out << YAML::EndMap;
+            }
+
+            if(entity.has_component<DirectionalLightComponent>()) {
+                out << YAML::Key << "DirectionalLightComponent";
+                out << YAML::BeginMap;
+
+                auto& dlc = entity.get_component<DirectionalLightComponent>();
+                out << YAML::Key << "Color" << YAML::Value << dlc.color;
+                out << YAML::Key << "Intensity" << YAML::Value << dlc.intensity;
+
+                out << YAML::EndMap;
+            }
+
+            if(entity.has_component<PointLightComponent>()) {
+                out << YAML::Key << "PointLightComponent";
+                out << YAML::BeginMap;
+
+                auto& plc = entity.get_component<PointLightComponent>();
+                out << YAML::Key << "Color" << YAML::Value << plc.color;
+                out << YAML::Key << "Intensity" << YAML::Value << plc.intensity;
+
+                out << YAML::EndMap;
+            }
+
+            if(entity.has_component<SpotLightComponent>()) {
+                out << YAML::Key << "SpotLightComponent";
+                out << YAML::BeginMap;
+
+                auto& slc = entity.get_component<SpotLightComponent>();
+                out << YAML::Key << "Color" << YAML::Value << slc.color;
+                out << YAML::Key << "Intensity" << YAML::Value << slc.intensity;
+                out << YAML::Key << "CutOff" << YAML::Value << slc.cut_off;
+                out << YAML::Key << "OuterCutOff" << YAML::Value << slc.outer_cut_off;
+
+                out << YAML::EndMap;
+            }
+
             out << YAML::EndMap;
 		});
 
@@ -225,6 +295,35 @@ namespace Stellar {
                 cc.camera.near_clip = camera_component["NearPlane"].as<f32>();
                 cc.camera.far_clip = camera_component["FarPlane"].as<f32>();
                 cc.is_dirty = true;
+            }
+
+            auto model_component = entity["ModelComponent"];
+            if (model_component) {
+                auto& mc = deserialized_entity.add_component<ModelComponent>();
+                mc.model = std::make_shared<Model>(device, model_component["Filepath"].as<std::string>());
+            }
+
+            auto directional_light_component = entity["DirectionalLightComponent"];
+            if (directional_light_component) {
+                auto& dlc = deserialized_entity.add_component<DirectionalLightComponent>();
+                dlc.color = directional_light_component["Color"].as<glm::vec3>();
+                dlc.intensity = directional_light_component["Intensity"].as<f32>();
+            }
+
+            auto point_light_component = entity["PointLightComponent"];
+            if (point_light_component) {
+                auto& plc = deserialized_entity.add_component<PointLightComponent>();
+                plc.color = point_light_component["Color"].as<glm::vec3>();
+                plc.intensity = point_light_component["Intensity"].as<f32>();
+            }
+
+            auto spot_light_component = entity["SpotLightComponent"];
+            if (spot_light_component) {
+                auto& slc = deserialized_entity.add_component<SpotLightComponent>();
+                slc.color = point_light_component["Color"].as<glm::vec3>();
+                slc.intensity = point_light_component["Intensity"].as<f32>();
+                slc.cut_off = point_light_component["CutOff"].as<f32>();
+                slc.outer_cut_off = point_light_component["OuterCutOff"].as<f32>();
             }
         }
 
@@ -273,8 +372,129 @@ namespace Stellar {
     }
 
     void Scene::update() {
-        iterate([](Entity entity){
-            entity.update();
+        bool light_updated = false;
+
+        iterate([&](Entity entity){
+            if(entity.has_component<TransformComponent>()) {
+                if(entity.get_component<TransformComponent>().is_dirty) {
+                    if(entity.has_component<DirectionalLightComponent>() || entity.has_component<PointLightComponent>() || entity.has_component<SpotLightComponent>()) {
+                        light_updated = true;
+                    }
+                }
+            }
+
+            if(entity.has_component<DirectionalLightComponent>()) {
+                if(entity.get_component<DirectionalLightComponent>().is_dirty) {
+                    light_updated = true;
+                    entity.get_component<DirectionalLightComponent>().is_dirty = false;
+                }
+            }
+
+            if(entity.has_component<PointLightComponent>()) {
+                if(entity.get_component<PointLightComponent>().is_dirty) {
+                    light_updated = true;
+                    entity.get_component<PointLightComponent>().is_dirty = false;
+                }
+            }
+
+            if(entity.has_component<SpotLightComponent>()) {
+                if(entity.get_component<SpotLightComponent>().is_dirty) {
+                    light_updated = true;
+                    entity.get_component<SpotLightComponent>().is_dirty = false;
+                }
+            }
+        });
+
+
+        if(light_updated) {
+            LightBuffer temp_light_buffer = {};
+            temp_light_buffer.num_directional_lights = 0;
+            temp_light_buffer.num_point_lights = 0;
+            temp_light_buffer.num_spot_lights = 0;
+
+            iterate([&](Entity entity){
+                if(entity.has_component<TransformComponent>()) {
+                    auto& tc = entity.get_component<TransformComponent>();
+
+                    if(entity.has_component<DirectionalLightComponent>()) {
+                        auto& light = entity.get_component<DirectionalLightComponent>();
+                        auto& temp_light = temp_light_buffer.directional_lights[temp_light_buffer.num_directional_lights];
+
+                        glm::vec3 rot = tc.rotation;
+                        glm::vec3 dir = { 0.0f, 1.0f, 0.0f };
+                        dir = glm::rotateX(dir, glm::radians(rot.x));
+                        dir = glm::rotateY(dir, glm::radians(rot.y));
+                        dir = glm::rotateZ(dir, glm::radians(rot.z));
+
+                        temp_light.direction = *reinterpret_cast<const f32vec3 *>(&dir);
+                        temp_light.color = *reinterpret_cast<const f32vec3 *>(&light.color);
+                        temp_light.intensity = light.intensity;
+
+                        temp_light_buffer.num_directional_lights++;
+                    }
+
+                    if(entity.has_component<PointLightComponent>()) {
+                        auto& light = entity.get_component<PointLightComponent>();
+                        auto& temp_light = temp_light_buffer.point_lights[temp_light_buffer.num_point_lights];
+
+                        temp_light.position = *reinterpret_cast<const f32vec3 *>(&tc.position);
+                        temp_light.color = *reinterpret_cast<const f32vec3 *>(&light.color);
+                        temp_light.intensity = light.intensity;
+
+                        temp_light_buffer.num_point_lights++;
+                    }
+
+                    if(entity.has_component<SpotLightComponent>()) {
+                        auto& light = entity.get_component<SpotLightComponent>();
+                        auto& temp_light = temp_light_buffer.spot_lights[temp_light_buffer.num_spot_lights];
+
+                        glm::vec3 rot = tc.rotation;
+                        glm::vec3 dir = { 0.0f, 1.0f, 0.0f };
+                        dir = glm::rotateX(dir, glm::radians(rot.x));
+                        dir = glm::rotateY(dir, glm::radians(rot.y));
+                        dir = glm::rotateZ(dir, glm::radians(rot.z));
+
+                        temp_light.position = *reinterpret_cast<const f32vec3 *>(&tc.position);
+                        temp_light.direction = *reinterpret_cast<const f32vec3 *>(&dir);
+                        temp_light.color = *reinterpret_cast<const f32vec3 *>(&light.color);
+                        temp_light.intensity = light.intensity;
+                        temp_light.cut_off = glm::cos(glm::radians(light.cut_off));
+                        temp_light.outer_cut_off = glm::cos(glm::radians(light.outer_cut_off));
+
+                        temp_light_buffer.num_spot_lights++;
+                    }
+                }
+            });
+
+            auto cmd_list = device.create_command_list({
+                .debug_name = "",
+            });
+
+            daxa::BufferId staging_light_buffer = device.create_buffer({
+                .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+                .size = sizeof(LightBuffer),
+                .debug_name = "light buffer",
+            });
+
+            cmd_list.destroy_buffer_deferred(staging_light_buffer);
+
+            auto* buffer_ptr = device.get_host_address_as<LightBuffer>(staging_light_buffer);
+            std::memcpy(buffer_ptr, &temp_light_buffer, sizeof(LightBuffer));
+
+            cmd_list.copy_buffer_to_buffer({
+                .src_buffer = staging_light_buffer,
+                .dst_buffer = light_buffer,
+                .size = sizeof(LightBuffer),
+            });
+
+            cmd_list.complete();
+            device.submit_commands({
+                .command_lists = {std::move(cmd_list)},
+            });
+        }
+
+        iterate([&](Entity entity){
+            entity.update(device);
         });
     }
 }

@@ -1,28 +1,41 @@
 Scene: Test
 Entities:
-  - Entity: 16300283054218962531
+  - Entity: 9726060176332043958
     TagComponent:
-      Tag: lol
+      Tag: Sponza
     RelationshipComponent:
-      Parent: 14308949813795185425
+      Parent: 0
       Children:
         []
-  - Entity: 245181788873058078
-    TagComponent:
-      Tag: test
-    RelationshipComponent:
-      Parent: 14308949813795185425
-      Children:
-        []
-  - Entity: 14308949813795185425
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ModelComponent:
+      Filepath: models/Sponza/Sponza.gltf
+  - Entity: 4656098338271287123
     TagComponent:
       Tag: pog
     RelationshipComponent:
       Parent: 0
       Children:
-        - 245181788873058078
-        - 16300283054218962531
+        - 18161999442681280284
+        - 2492474968445572470
     TransformComponent:
       Position: [1, 2, 3]
       Rotation: [80, 60, 20]
       Scale: [1, 1, 1]
+  - Entity: 18161999442681280284
+    TagComponent:
+      Tag: test
+    RelationshipComponent:
+      Parent: 4656098338271287123
+      Children:
+        []
+  - Entity: 2492474968445572470
+    TagComponent:
+      Tag: lol
+    RelationshipComponent:
+      Parent: 4656098338271287123
+      Children:
+        []

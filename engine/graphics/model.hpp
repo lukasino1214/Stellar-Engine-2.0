@@ -8,10 +8,6 @@
 #include "../../shaders/shared.inl"
 
 namespace Stellar {
-    struct Material {
-        u32 albedo_texture_index;
-    };
-
     struct Primitive {
         u32 first_index;
         u32 first_vertex;
@@ -21,7 +17,7 @@ namespace Stellar {
     };
 
     struct Model {
-        Model(daxa::Device _device, const std::string_view& file_path);
+        Model(daxa::Device _device, const std::string_view& _file_path);
         ~Model();
 
         void draw(daxa::CommandList& cmd_list, DepthPrepassPush& draw_push);
@@ -30,9 +26,12 @@ namespace Stellar {
         daxa::Device device;
         daxa::BufferId face_buffer = {};
         daxa::BufferId index_buffer = {};
+        daxa::BufferId material_info_buffer = {};
         
         std::vector<std::unique_ptr<Texture>> textures = {};
-        std::vector<Material> materials = {};
+        std::vector<MaterialInfo> materials = {};
         std::vector<Primitive> primitives = {};
+
+        std::string file_path;
     };
 }

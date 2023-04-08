@@ -172,9 +172,31 @@ namespace Stellar {
                 draw_component<CameraComponent>(selected_entity, "Camera Component");
             }
 
+            if(selected_entity.has_component<ModelComponent>()) {
+                draw_component<ModelComponent>(selected_entity, "Model Component");
+            }
+
+            if(selected_entity.has_component<DirectionalLightComponent>()) {
+                draw_component<DirectionalLightComponent>(selected_entity, "Directional Light Component");
+            }
+
+            if(selected_entity.has_component<PointLightComponent>()) {
+                draw_component<PointLightComponent>(selected_entity, "Point Light Component");
+            }
+
+            if(selected_entity.has_component<SpotLightComponent>()) {
+                draw_component<SpotLightComponent>(selected_entity, "Spot Light Component");
+            }
+
             if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
                 add_new_component<TransformComponent>(selected_entity, "Add Transform Component");
                 add_new_component<CameraComponent>(selected_entity, "Add Camera Component");
+
+                if(!(selected_entity.has_component<DirectionalLightComponent>() || selected_entity.has_component<PointLightComponent>() || selected_entity.has_component<SpotLightComponent>())) {
+                    add_new_component<DirectionalLightComponent>(selected_entity, "Add Directional Light Component");
+                    add_new_component<PointLightComponent>(selected_entity, "Add Point Light Component");
+                    add_new_component<SpotLightComponent>(selected_entity, "Add Spot Light Component");
+                }
 
                 ImGui::EndPopup();
             }

@@ -24,7 +24,7 @@ using namespace std::literals;
 #include "editor.hpp"
 
 auto loading_screen(Stellar::Context& context, daxa::Swapchain swapchain) -> bool {
-    Stellar::Texture texture = Stellar::Texture(context.device, "pic.png");
+    Stellar::Texture texture = Stellar::Texture(context.device, "pic.png", daxa::Format::R8G8B8A8_SRGB);
 
     auto pipeline = context.pipeline_manager.add_raster_pipeline({
         .vertex_shader_info = {.source = daxa::ShaderFile{"loading_screen.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},

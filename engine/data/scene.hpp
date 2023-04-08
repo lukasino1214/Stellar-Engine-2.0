@@ -12,8 +12,8 @@ namespace Stellar {
     struct Entity;
 
     struct Scene {
-        explicit Scene(const std::string_view& _name);
-        ~Scene() = default;
+        explicit Scene(const std::string_view& _name, daxa::Device _device);
+        ~Scene();
 
         auto create_entity(const std::string_view& _name) -> Entity;
         auto create_entity_with_UUID(const std::string_view& _name, UUID _uuid) -> Entity;
@@ -31,5 +31,8 @@ namespace Stellar {
 
         std::string name;
         std::unique_ptr<entt::registry> registry;
+        daxa::Device device;
+
+        daxa::BufferId light_buffer;
     };
 }

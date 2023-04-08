@@ -47,7 +47,7 @@ namespace Stellar {
             scene->registry->remove<T>(handle);
         }
 
-        void update();
+        void update(daxa::Device& device);
 
         entt::entity handle{ entt::null };
 		Scene* scene = nullptr;

@@ -5,7 +5,7 @@ using namespace daxa::types;
 
 namespace Stellar {
     struct Texture {
-        Texture(daxa::Device _device, const std::string_view& _path);
+        Texture(daxa::Device _device, const std::string_view& _path, daxa::Format format);
         ~Texture();
 
         daxa::Device device;

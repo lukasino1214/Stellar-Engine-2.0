@@ -6,7 +6,7 @@
 #include <cstring>
 
 namespace Stellar {
-    Texture::Texture(daxa::Device _device, const std::string_view& _path) : device{_device}, path{_path} {
+    Texture::Texture(daxa::Device _device, const std::string_view& _path, daxa::Format format) : device{_device}, path{_path} {
         i32 size_x = 0;
         i32 size_y = 0;
         i32 num_channels = 0;
@@ -22,7 +22,7 @@ namespace Stellar {
 
         image_id = device.create_image({
             .dimensions = 2,
-            .format = daxa::Format::R8G8B8A8_SRGB,
+            .format = format,
             .aspect = daxa::ImageAspectFlagBits::COLOR,
             .size = { static_cast<u32>(size_x), static_cast<u32>(size_y), 1 },
             .mip_level_count = 1,
