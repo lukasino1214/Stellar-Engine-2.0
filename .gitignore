@@ -5,3 +5,5 @@ build/
 imgui.ini
 *.exr
 compile_commands.json
+.obsidian/
+TODO.md

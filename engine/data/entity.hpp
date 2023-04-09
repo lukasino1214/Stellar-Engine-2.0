@@ -43,6 +43,13 @@ namespace Stellar {
         }
 
         template<typename T>
+        void try_add_component() const {
+            if(!has_component<T>()) {
+                add_component<T>();
+            }
+        }
+
+        template<typename T>
         void remove_component() const {
             scene->registry->remove<T>(handle);
         }

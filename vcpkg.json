@@ -32,7 +32,8 @@
     "yaml-cpp",
     "spdlog",
     "fmt",
-    "assimp"
+    "assimp",
+    "imguizmo"
   ],
   "vcpkg-configuration": {
     "overlay-ports": [

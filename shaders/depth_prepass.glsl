@@ -7,7 +7,7 @@ DAXA_USE_PUSH_CONSTANT(DepthPrepassPush)
 #if defined(DRAW_VERT)
 
 void main() {
-    gl_Position = daxa_push_constant.mvp * deref(daxa_push_constant.transform_buffer).model_matrix * vec4(deref(daxa_push_constant.vertex_buffer[gl_VertexIndex]).position, 1.0);
+    gl_Position = CAMERA.projection_matrix * CAMERA.view_matrix * TRANSFORM.model_matrix * f32vec4(VERTEX.position, 1.0);
 }
 
 #elif defined(DRAW_FRAG)

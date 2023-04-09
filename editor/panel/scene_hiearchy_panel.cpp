@@ -12,7 +12,7 @@
 
 namespace Stellar {
     template<typename T>
-    inline void draw_component(Entity entity, const std::string_view& component_name) {
+    void SceneHiearchyPanel::draw_component(Entity entity, const std::string_view& component_name) {
         const ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_FramePadding;
         if (entity.has_component<T>()) {
             auto& component = entity.get_component<T>();
@@ -40,7 +40,11 @@ namespace Stellar {
             }
 
             if (open) {
-                component.draw();
+                if constexpr(std::is_same<T, ModelComponent>::value) {
+                    component.draw(scene->device);
+                } else {
+                    component.draw();
+                }
                 GUI::indent(0.0f, GImGui->Style.ItemSpacing.y);
                 ImGui::TreePop();
             }
@@ -56,6 +60,16 @@ namespace Stellar {
         if(!entity.has_component<T>()) {
             if (ImGui::MenuItem(component_name.data())) {
                 entity.add_component<T>();
+            
+                if constexpr(std::is_same_v<T, ModelComponent>) {
+                    entity.try_add_component<TransformComponent>();
+                } else if constexpr(std::is_same_v<T, DirectionalLightComponent>) {
+                    entity.try_add_component<TransformComponent>();
+                } else if constexpr(std::is_same_v<T, PointLightComponent>) {
+                    entity.try_add_component<TransformComponent>();
+                } else if constexpr(std::is_same_v<T, SpotLightComponent>) {
+                    entity.try_add_component<TransformComponent>();
+                }
             }
         }
     }
@@ -77,18 +91,20 @@ namespace Stellar {
 
         bool opened = ImGui::TreeNodeEx(reinterpret_cast<void*>(entity.get_component<UUIDComponent>().uuid.uuid), treeNodeFlags, "%s", entity.get_component<TagComponent>().name.c_str());
 
-        if (ImGui::IsItemClicked()) {
+        if (ImGui::IsItemClicked(ImGuiPopupFlags_MouseButtonLeft) || ImGui::IsItemClicked(ImGuiPopupFlags_MouseButtonRight)) {
             selected_entity = entity;
         }
 
         bool entity_deleted = false;
 		if (ImGui::BeginPopupContextItem()) {
-            if (ImGui::MenuItem("Create Children Entity")) {
-                Entity created_entity = scene->create_entity("Empty Entity");
+            if(selected_entity) {
+                if (ImGui::MenuItem("Create Children Entity")) {
+                    Entity created_entity = scene->create_entity("Empty Entity");
 
-                if(selected_entity) {
-                    selected_entity.get_component<RelationshipComponent>().children.push_back(created_entity);
-                    created_entity.get_component<RelationshipComponent>().parent = selected_entity;
+                    if(selected_entity) {
+                        selected_entity.get_component<RelationshipComponent>().children.push_back(created_entity);
+                        created_entity.get_component<RelationshipComponent>().parent = selected_entity;
+                    }
                 }
             }
 
@@ -190,6 +206,7 @@ namespace Stellar {
 
             if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
                 add_new_component<TransformComponent>(selected_entity, "Add Transform Component");
+                add_new_component<ModelComponent>(selected_entity, "Add Model Component");
                 add_new_component<CameraComponent>(selected_entity, "Add Camera Component");
 
                 if(!(selected_entity.has_component<DirectionalLightComponent>() || selected_entity.has_component<PointLightComponent>() || selected_entity.has_component<SpotLightComponent>())) {

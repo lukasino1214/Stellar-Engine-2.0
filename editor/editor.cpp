@@ -64,6 +64,9 @@ namespace Stellar {
         size_x = swapchain.get_surface_extent().x;
         size_y = swapchain.get_surface_extent().y;
 
+        viewport_size_x = swapchain.get_surface_extent().x;
+        viewport_size_y = swapchain.get_surface_extent().y;
+
         Logger::init();
         CORE_INFO("Test");
 
@@ -121,6 +124,12 @@ namespace Stellar {
         Entity e = scene->create_entity("Directional Light");
         e.add_component<TransformComponent>();
         e.add_component<DirectionalLightComponent>();
+
+        editor_camera_buffer = context.device.create_buffer({
+            .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+            .size = sizeof(CameraInfo),
+            .debug_name = "editor camera buffer"
+        });
     }
 
     Editor::~Editor() {
@@ -130,6 +139,7 @@ namespace Stellar {
         context.device.collect_garbage();
         context.device.destroy_image(render_image);
         context.device.destroy_image(depth_image);
+        context.device.destroy_buffer(editor_camera_buffer);
     }
 
     void Editor::run() {
@@ -186,6 +196,34 @@ namespace Stellar {
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
         ImGui::Begin("Viewport");
+        ImVec2 v = ImGui::GetContentRegionAvail();
+        if(v.x != static_cast<f32>(viewport_size_x) || v.y != static_cast<f32>(viewport_size_y)) {
+            viewport_size_x = static_cast<u32>(v.x);
+            viewport_size_y = static_cast<u32>(v.y);
+
+            context.device.destroy_image(render_image);
+            render_image = context.device.create_image({
+                .format = daxa::Format::R8G8B8A8_UNORM,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { viewport_size_x, viewport_size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "render_image"
+            });
+
+            context.device.destroy_image(depth_image);
+            depth_image = context.device.create_image({
+                .format = daxa::Format::D32_SFLOAT,
+                .aspect = daxa::ImageAspectFlagBits::DEPTH,
+                .size = { viewport_size_x, viewport_size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "depth_image"
+            });
+
+            editor_camera.camera.resize(static_cast<i32>(v.x), static_cast<i32>(v.y));
+        }
+
         ImGui::Image(*reinterpret_cast<ImTextureID const *>(&render_image), ImGui::GetContentRegionAvail(), ImVec2 {});
         ImGui::End();
         ImGui::PopStyleVar();
@@ -208,6 +246,22 @@ namespace Stellar {
         glm::mat4 projection = editor_camera.camera.get_projection();
         glm::mat4 view = editor_camera.camera.get_view();
 
+        glm::mat4 temp_inverse_projection_mat = glm::inverse(projection);
+        glm::mat4 temp_inverse_view_mat = glm::inverse(view);
+
+        CameraInfo camera_info = {
+            .projection_matrix = *reinterpret_cast<f32mat4x4*>(&projection),
+            .inverse_projection_matrix = *reinterpret_cast<f32mat4x4*>(&temp_inverse_projection_mat),
+            .view_matrix = *reinterpret_cast<f32mat4x4*>(&view),
+            .inverse_view_matrix = *reinterpret_cast<f32mat4x4*>(&temp_inverse_view_mat),
+            .position = *reinterpret_cast<f32vec3*>(&editor_camera.position)
+        };
+
+        {
+            auto* buffer_ptr = context.device.get_host_address_as<CameraInfo>(editor_camera_buffer);
+            std::memcpy(buffer_ptr, &camera_info, sizeof(CameraInfo));
+        }
+
         cmd_list.pipeline_barrier_image_transition({
             .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
             .before_layout = daxa::ImageLayout::UNDEFINED,
@@ -221,7 +275,7 @@ namespace Stellar {
                 .load_op = daxa::AttachmentLoadOp::CLEAR,
                 .clear_value = daxa::DepthValue{1.0f, 0},
             }},
-            .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+            .render_area = {.x = 0, .y = 0, .width = viewport_size_x, .height = viewport_size_y},
         });
  
         cmd_list.set_pipeline(*depth_prepass_pipeline);
@@ -230,11 +284,11 @@ namespace Stellar {
             if(entity.has_component<ModelComponent>()) {
                 auto& tc = entity.get_component<TransformComponent>();
                 auto& mc = entity.get_component<ModelComponent>();
-
-                glm::mat4x4 mvp = projection * view;
+                if(!mc.model) { return; }
 
                 DepthPrepassPush draw_push;
-                draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+                //draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+                draw_push.camera_info = context.device.get_device_address(editor_camera_buffer);
                 draw_push.transform_buffer = context.device.get_device_address(tc.transform_buffer);
                 mc.model->draw(cmd_list, draw_push);
             }
@@ -253,7 +307,7 @@ namespace Stellar {
                 .load_op = daxa::AttachmentLoadOp::LOAD,
                 .clear_value = daxa::DepthValue{1.0f, 0},
             }},
-            .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+            .render_area = {.x = 0, .y = 0, .width = viewport_size_x, .height = viewport_size_y},
         });
  
         cmd_list.set_pipeline(*raster_pipeline);
@@ -262,11 +316,10 @@ namespace Stellar {
             if(entity.has_component<ModelComponent>()) {
                 auto& tc = entity.get_component<TransformComponent>();
                 auto& mc = entity.get_component<ModelComponent>();
-
-                glm::mat4x4 mvp = projection * view;
+                if(!mc.model) { return; }
 
                 DrawPush draw_push;
-                draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
+                draw_push.camera_info = context.device.get_device_address(editor_camera_buffer);
                 draw_push.transform_buffer = context.device.get_device_address(tc.transform_buffer);
                 draw_push.light_buffer = context.device.get_device_address(scene->light_buffer);
                 mc.model->draw(cmd_list, draw_push);
@@ -328,26 +381,6 @@ namespace Stellar {
             size_y = swapchain.get_surface_extent().y;
             window->width = static_cast<i32>(size_x);
             window->height = static_cast<i32>(size_y);
-
-            context.device.destroy_image(render_image);
-            render_image = context.device.create_image({
-                .format = daxa::Format::R8G8B8A8_UNORM,
-                .aspect = daxa::ImageAspectFlagBits::COLOR,
-                .size = { size_x, size_y, 1 },
-                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
-                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
-                .debug_name = "render_image"
-            });
-
-            context.device.destroy_image(depth_image);
-            depth_image = context.device.create_image({
-                .format = daxa::Format::D32_SFLOAT,
-                .aspect = daxa::ImageAspectFlagBits::DEPTH,
-                .size = { size_x, size_y, 1 },
-                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
-                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
-                .debug_name = "depth_image"
-            });
 
             render();
         //}

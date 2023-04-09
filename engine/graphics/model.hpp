@@ -17,7 +17,7 @@ namespace Stellar {
     };
 
     struct Model {
-        Model(daxa::Device _device, const std::string_view& _file_path);
+        Model(daxa::Device _device, const std::string_view& file_path);
         ~Model();
 
         void draw(daxa::CommandList& cmd_list, DepthPrepassPush& draw_push);
@@ -31,7 +31,5 @@ namespace Stellar {
         std::vector<std::unique_ptr<Texture>> textures = {};
         std::vector<MaterialInfo> materials = {};
         std::vector<Primitive> primitives = {};
-
-        std::string file_path;
     };
 }

@@ -43,6 +43,8 @@ namespace Stellar {
 
         u32 size_x;
         u32 size_y;
+        u32 viewport_size_x;
+        u32 viewport_size_y;
 
         daxa::ImageId render_image;
         daxa::ImageId depth_image;
@@ -62,6 +64,7 @@ namespace Stellar {
         f64 lastFrameTime = 0;
 
         ControlledCamera3D editor_camera;
+        daxa::BufferId editor_camera_buffer;
         std::shared_ptr<Scene> scene;
     };
 }

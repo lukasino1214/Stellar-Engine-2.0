@@ -2,7 +2,10 @@
 
 #include <cstring>
 
+#include <memory>
 #include <utils/gui.hpp>
+
+#include <filesystem>
 
 namespace Stellar {
     void UUIDComponent::draw() {
@@ -54,12 +57,16 @@ namespace Stellar {
         GUI::end_properties();
     }
 
-    void ModelComponent::draw() {
+    void ModelComponent::draw(daxa::Device device) {
         GUI::begin_properties();
 
-        GUI::push_deactivated_status();
-        GUI::string_property("File Path:", model->file_path, nullptr, ImGuiInputTextFlags_ReadOnly);
-        GUI::pop_deactivated_status();
+        GUI::string_property("File Path:", file_path, nullptr, ImGuiInputTextFlags_ReadOnly);
+
+        if(ImGui::Button("Load")) {
+            if(std::filesystem::exists(file_path)) {
+                model = std::make_shared<Model>(device, file_path);
+            }
+        }
 
         GUI::end_properties();
     }

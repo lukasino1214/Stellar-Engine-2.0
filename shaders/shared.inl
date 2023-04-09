@@ -1,23 +1,23 @@
 #pragma once
 #include <daxa/daxa.inl>
 
-struct TextureID {
+struct TextureId {
     daxa_Image2Df32 texture_id;
     daxa_SamplerId sampler_id;
 };
 
 struct MaterialInfo {
-    TextureID albedo_texture;
+    TextureId albedo_texture;
     daxa_f32vec4 albedo_factor;
     daxa_u32 has_albedo_texture;
-    TextureID metallic_texture;
+    TextureId metallic_texture;
     daxa_f32 metallic_factor;
     daxa_u32 has_metallic_texture;
-    TextureID roughness_texture;
+    TextureId roughness_texture;
     daxa_f32 roughness_factor;
     daxa_u32 has_roughness_texture;
     daxa_u32 has_metallic_roughness_combined;
-    TextureID normal_map_texture;
+    TextureId normal_map_texture;
     daxa_u32 has_normal_map_texture;
 };
 
@@ -29,6 +29,16 @@ struct TransformInfo {
 };
 
 DAXA_ENABLE_BUFFER_PTR(TransformInfo)
+
+struct CameraInfo {
+    daxa_f32mat4x4 projection_matrix;
+    daxa_f32mat4x4 inverse_projection_matrix;
+    daxa_f32mat4x4 view_matrix;
+    daxa_f32mat4x4 inverse_view_matrix;
+    daxa_f32vec3 position;
+};
+
+DAXA_ENABLE_BUFFER_PTR(CameraInfo)
 
 struct DirectionalLight {
     daxa_f32vec3 direction;
@@ -85,17 +95,26 @@ struct TexturePush {
 };
 
 struct DrawPush {
-    daxa_f32mat4x4 mvp;
     daxa_BufferPtr(Vertex) vertex_buffer;
-    TextureID albedo_texture;
     daxa_BufferPtr(MaterialInfo) material_buffer;
     daxa_i32 material_index;
     daxa_BufferPtr(TransformInfo) transform_buffer;
     daxa_BufferPtr(LightBuffer) light_buffer;
+    daxa_BufferPtr(CameraInfo) camera_info;
 };
 
 struct DepthPrepassPush {
-    daxa_f32mat4x4 mvp;
+    daxa_BufferPtr(CameraInfo) camera_info;
     daxa_BufferPtr(Vertex) vertex_buffer;
     daxa_BufferPtr(TransformInfo) transform_buffer;
 };
+
+
+
+#define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)
+
+#define MATERIAL deref(daxa_push_constant.material_buffer[daxa_push_constant.material_index])
+#define LIGHT_BUFFER deref(daxa_push_constant.light_buffer)
+#define CAMERA deref(daxa_push_constant.camera_info)
+#define TRANSFORM deref(daxa_push_constant.transform_buffer)
+#define VERTEX deref(daxa_push_constant.vertex_buffer[gl_VertexIndex])

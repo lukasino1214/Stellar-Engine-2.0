@@ -21,6 +21,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     "utils/utils.cpp"
     "utils/gui.hpp"
     "utils/gui.cpp"
+    "utils/threadpool.hpp"
+    
 )
 
 set_project_warnings(${PROJECT_NAME})
@@ -50,6 +52,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE fmt::fmt-header-only)
 
 find_package(assimp CONFIG REQUIRED)
 target_link_libraries(${PROJECT_NAME} PRIVATE assimp::assimp)
+
+find_package(imguizmo CONFIG REQUIRED)
+target_link_libraries(${PROJECT_NAME} PRIVATE imguizmo::imguizmo)
 
 target_include_directories(
     ${PROJECT_NAME}

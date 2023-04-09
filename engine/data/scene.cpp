@@ -9,6 +9,8 @@
 #include <yaml-cpp/emittermanip.h>
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
+
 #include <fstream>
 #include <iostream>
 #include <cstring>
@@ -122,6 +124,16 @@ namespace Stellar {
             destroy_entity(Entity { _children, this });
         }
 
+        if(rc.parent != entt::null) {
+            Entity parent{ rc.parent, this };
+            auto& p_rc = parent.get_component<RelationshipComponent>();
+            p_rc.children.erase(std::remove(p_rc.children.begin(), p_rc.children.end(), entity.handle), p_rc.children.end());
+        }
+
+        if(entity.has_component<TransformComponent>()) {
+            device.destroy_buffer(entity.get_component<TransformComponent>().transform_buffer);
+        }
+
         registry->destroy(entity.handle);
     }
 
@@ -212,7 +224,7 @@ namespace Stellar {
                 out << YAML::BeginMap;
 
                 auto& mc = entity.get_component<ModelComponent>();
-                out << YAML::Key << "Filepath" << YAML::Value << mc.model->file_path;
+                out << YAML::Key << "Filepath" << YAML::Value << mc.file_path;
 
                 out << YAML::EndMap;
             }
@@ -300,7 +312,8 @@ namespace Stellar {
             auto model_component = entity["ModelComponent"];
             if (model_component) {
                 auto& mc = deserialized_entity.add_component<ModelComponent>();
-                mc.model = std::make_shared<Model>(device, model_component["Filepath"].as<std::string>());
+                mc.file_path = model_component["Filepath"].as<std::string>();
+                mc.model = std::make_shared<Model>(device, mc.file_path);
             }
 
             auto directional_light_component = entity["DirectionalLightComponent"];

@@ -12,8 +12,10 @@
 #include <iostream>
 #include <string>
 
+#include <utils/threadpool.hpp>
+
 namespace Stellar {
-    Model::Model(daxa::Device _device, const std::string_view& _file_path) : device{_device}, file_path{_file_path}  {
+    Model::Model(daxa::Device _device, const std::string_view& file_path) : device{_device} {
         if(!std::filesystem::exists(file_path)) {
             throw std::runtime_error("couldn't find a model");
         }
@@ -36,12 +38,171 @@ namespace Stellar {
                 }
             }
 
-            std::unique_ptr<Texture> texture = std::make_unique<Texture>(device, path, format);
+            throw std::runtime_error("ooops");
+            return 0;
+            // Uncomment this when debugging some fuckery
+            /*std::unique_ptr<Texture> texture = std::make_unique<Texture>(device, path, format);
             textures.push_back(std::move(texture));
-            return textures.size() - 1;
+            return textures.size() - 1;*/
         };
 
         std::string format = std::string{file_path.substr(file_path.find_last_of(".") + 1)};
+
+        struct TextureHelper {
+            std::string path;
+            daxa::Format format;
+        };
+
+        std::vector<TextureHelper> texture_helpers = {};
+        auto vec_set = [&](const std::string& path, daxa::Format format){
+            for(auto& tex : texture_helpers) {
+                if(tex.path == path) { return; }
+            }
+
+            texture_helpers.push_back({
+                .path = path,
+                .format = format
+            });
+        };
+
+        for(usize i = 0; i < scene->mNumMaterials; i++) {
+            const aiMaterial* material = scene->mMaterials[i];
+
+            if (aiString diffuseTex{}; aiGetMaterialTexture(material, aiTextureType_DIFFUSE, 0, &diffuseTex) == AI_SUCCESS) {
+				std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + diffuseTex.C_Str();
+                vec_set(texture, daxa::Format::R8G8B8A8_SRGB);
+			}
+
+            if (aiString specularTex{}; aiGetMaterialTexture(material, aiTextureType_SPECULAR, 0, &specularTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + specularTex.C_Str();
+                //std::cout << "aiTextureType_SPECULAR: " << texture << std::endl;
+                throw std::runtime_error("unhandled aiTextureType_SPECULAR: " + texture);
+			}
+
+            if (aiString ambientTex{}; aiGetMaterialTexture(material, aiTextureType_AMBIENT, 0, &ambientTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + ambientTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_AMBIENT: " + texture);
+			}
+
+            if (aiString emissiveTex{}; aiGetMaterialTexture(material, aiTextureType_EMISSIVE, 0, &emissiveTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + emissiveTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_EMISSIVE: " + texture);
+			}
+
+            if (aiString heightTex{}; aiGetMaterialTexture(material, aiTextureType_HEIGHT, 0, &heightTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + heightTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_HEIGHT: " + texture);
+			}
+
+            if (aiString normalTex{}; aiGetMaterialTexture(material, aiTextureType_NORMALS, 0, &normalTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + normalTex.C_Str();
+                vec_set(texture, daxa::Format::R8G8B8A8_UNORM);
+			}
+
+            if (aiString shininessTex{}; aiGetMaterialTexture(material, aiTextureType_SHININESS, 0, &shininessTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + shininessTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_SHININESS: " + texture);
+			}
+
+            if (aiString opacityTex{}; aiGetMaterialTexture(material, aiTextureType_OPACITY, 0, &opacityTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + opacityTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_OPACITY: " + texture);
+			}
+
+            if (aiString displacementTex{}; aiGetMaterialTexture(material, aiTextureType_DISPLACEMENT, 0, &displacementTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + displacementTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_DISPLACEMENT: " + texture);
+			}
+
+            if (aiString lightmapTex{}; aiGetMaterialTexture(material, aiTextureType_LIGHTMAP, 0, &lightmapTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + lightmapTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_LIGHTMAP: " + texture);
+			}
+
+            if (aiString reflectionTex{}; aiGetMaterialTexture(material, aiTextureType_REFLECTION, 0, &reflectionTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + reflectionTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_REFLECTION: " + texture);
+			}
+
+            if (aiString baseColorTex{}; aiGetMaterialTexture(material, aiTextureType_BASE_COLOR, 0, &baseColorTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + baseColorTex.C_Str();
+			}
+
+            if (aiString normalCameraTex{}; aiGetMaterialTexture(material, aiTextureType_NORMAL_CAMERA, 0, &normalCameraTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + normalCameraTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_NORMAL_CAMERA: " + texture);
+			}
+
+            if (aiString emissionColorTex{}; aiGetMaterialTexture(material, aiTextureType_EMISSION_COLOR, 0, &emissionColorTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + emissionColorTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_EMISSION_COLOR: " + texture);
+			}
+
+            if (aiString metalnessTex{}; aiGetMaterialTexture(material, aiTextureType_METALNESS, 0, &metalnessTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + metalnessTex.C_Str();
+                vec_set(texture, daxa::Format::R8G8B8A8_UNORM);
+			}
+
+            if (aiString roughnessTex{}; aiGetMaterialTexture(material, aiTextureType_DIFFUSE_ROUGHNESS, 0, &roughnessTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + roughnessTex.C_Str();
+                vec_set(texture, daxa::Format::R8G8B8A8_UNORM);
+			}
+
+            if (aiString ambientOcclusionTex{}; aiGetMaterialTexture(material, aiTextureType_AMBIENT_OCCLUSION, 0, &ambientOcclusionTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + ambientOcclusionTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_AMBIENT_OCCLUSION: " + texture);
+			}
+
+            if (aiString sheenTex{}; aiGetMaterialTexture(material, aiTextureType_SHEEN, 0, &sheenTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + sheenTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_SHEEN: " + texture);
+			}
+
+            if (aiString clearcoatTex{}; aiGetMaterialTexture(material, aiTextureType_CLEARCOAT, 0, &clearcoatTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + clearcoatTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_CLEARCOAT: " + texture);
+			}
+
+            if (aiString transmissionTex{}; aiGetMaterialTexture(material, aiTextureType_TRANSMISSION, 0, &transmissionTex) == AI_SUCCESS) {
+                std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + transmissionTex.C_Str();
+                throw std::runtime_error("unhandled aiTextureType_TRANSMISSION: " + texture);
+			}
+        }
+
+
+        textures.resize(texture_helpers.size());
+        struct TextureHolder {
+            std::unique_ptr<Texture> texture;
+            daxa::CommandList cmd_list;
+            u32 index;
+        };
+        std::vector<TextureHolder> texture_holders;
+        texture_holders.resize(texture_helpers.size());
+        auto load_texture = [&](TextureHelper helper, u32 index){
+            auto tex = Texture::load(device, helper.path, helper.format);
+            texture_holders[index] = {
+                .texture = std::move(tex.first),
+                .cmd_list = tex.second,
+                .index = index
+            };
+        };
+
+        ThreadPool pool(std::thread::hardware_concurrency());
+        for (u32 i = 0; i < texture_helpers.size(); i++) {
+            pool.push_task(load_texture, texture_helpers[i], i);
+        }
+
+        pool.wait_for_tasks();
+
+        for(auto& tex : texture_holders) {
+            device.submit_commands({
+                .command_lists = {std::move(tex.cmd_list)},
+            });
+
+            textures[tex.index] = std::move(tex.texture);
+        }
+
+        device.wait_idle();
         
         for(usize i = 0; i < scene->mNumMaterials; i++) {
             const aiMaterial* material = scene->mMaterials[i];
@@ -61,7 +222,6 @@ namespace Stellar {
                     .sampler_id = textures[index]->sampler_id
                 };
                 my_material.has_albedo_texture = 1;
-                //std::cout << "aiTextureType_DIFFUSE: " << texture << std::endl;
 			}
 
             if (aiString specularTex{}; aiGetMaterialTexture(material, aiTextureType_SPECULAR, 0, &specularTex) == AI_SUCCESS) {
@@ -454,7 +614,6 @@ namespace Stellar {
         draw_push.material_buffer = device.get_device_address(material_info_buffer);
         draw_push.vertex_buffer = device.get_device_address(face_buffer);
         for (auto & primitive : primitives) {
-            draw_push.albedo_texture = materials[primitive.material_index].albedo_texture;
             draw_push.material_index = primitive.material_index;
             cmd_list.push_constant(draw_push);
 

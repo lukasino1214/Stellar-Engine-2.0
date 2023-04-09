@@ -47,9 +47,10 @@ namespace Stellar {
     };
 
     struct ModelComponent {
+        std::string file_path = "";
         std::shared_ptr<Model> model;
 
-        void draw();
+        void draw(daxa::Device device);
     };
 
     struct DirectionalLightComponent {
