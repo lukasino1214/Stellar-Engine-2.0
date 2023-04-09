@@ -50,7 +50,7 @@ namespace Stellar {
     }
 
     void Window::set_mouse_capture(bool should_capture) {
-        glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2), static_cast<f64>(height / 2));
+        //glfwSetCursorPos(glfw_window_ptr, static_cast<f64>(width / 2), static_cast<f64>(height / 2));
         glfwSetInputMode(glfw_window_ptr, GLFW_CURSOR, should_capture ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL);
         glfwSetInputMode(glfw_window_ptr, GLFW_RAW_MOUSE_MOTION, should_capture);
     }

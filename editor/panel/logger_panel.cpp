@@ -2,27 +2,18 @@
 #include "core/types.hpp"
 
 namespace Stellar {
-/*struct ImGuiConsole {
-    char input_buffer[256];
-    std::vector<char *> items;
-    std::vector<const char *> commands;
-    std::vector<char *> history;
-    int history_pos;
-    ImGuiTextFilter filter;
-    bool auto_scroll;
-    bool scroll_to_bottom;*/
-
-    ImGuiConsole::ImGuiConsole() : input_buffer{}, history_pos{-1}, auto_scroll{true}, scroll_to_bottom{false} {
+    LoggerPanel::LoggerPanel() : input_buffer{}, history_pos{-1}, auto_scroll{true}, scroll_to_bottom{false} {
         clear_log();
     }
-    ImGuiConsole::~ImGuiConsole() {
+
+    LoggerPanel::~LoggerPanel() {
         clear_log();
         for(usize i = 0; i < history.size(); i++) {
             std::free(history[i]);
         }
     }
 
-    auto ImGuiConsole::Stricmp(const char *s1, const char *s2) -> int {
+    auto LoggerPanel::Stricmp(const char *s1, const char *s2) -> int {
         int d = 0;
         while ((d = toupper(*s2) - toupper(*s1)) == 0 && (*s1 != 0)) {
             s1++;
@@ -30,7 +21,8 @@ namespace Stellar {
         }
         return d;
     }
-    auto ImGuiConsole::Strnicmp(const char *s1, const char *s2, int n) -> int {
+
+    auto LoggerPanel::Strnicmp(const char *s1, const char *s2, int n) -> int {
         int d = 0;
         while (n > 0 && (d = toupper(*s2) - toupper(*s1)) == 0 && (*s1 != 0)) {
             s1++;
@@ -39,27 +31,31 @@ namespace Stellar {
         }
         return d;
     }
-    auto ImGuiConsole::Strdup(const char *s) -> char * {
+
+    auto LoggerPanel::Strdup(const char *s) -> char * {
         IM_ASSERT(s);
         size_t len = strlen(s) + 1;
         void *buf = malloc(len);
         IM_ASSERT(buf);
         return reinterpret_cast<char *>(std::memcpy(buf, reinterpret_cast<const void *>(s), len));
     }
-    void ImGuiConsole::Strtrim(char *s) {
+
+    void LoggerPanel::Strtrim(char *s) {
         char *str_end = s + strlen(s);
         while (str_end > s && str_end[-1] == ' ') {
             str_end--;
         }
         *str_end = 0;
     }
-    void ImGuiConsole::clear_log() {
+
+    void LoggerPanel::clear_log() {
         for (usize i = 0; i < items.size(); i++) {
             std::free(items[i]);
         }
         items.clear();
     }
-    void ImGuiConsole::add_log(const char *fmt, ...) {
+
+    void LoggerPanel::add_log(const char *fmt, ...) {
         std::array<char, 1024> buf = {};
         va_list args;
         va_start(args, fmt);
@@ -67,9 +63,9 @@ namespace Stellar {
         buf[buf.size() - 1] = 0;
         va_end(args);
         items.push_back(Strdup(buf.data()));
-        // std::cout << buf << std::endl;
     }
-    void ImGuiConsole::draw(const char *title, bool *p_open) {
+
+    void LoggerPanel::draw(const char *title, bool *p_open) {
         ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
         if (!ImGui::Begin(title, p_open)) { ImGui::End(); return; }
         if (ImGui::BeginPopupContextItem()) { if (ImGui::MenuItem("Close Console")) { *p_open = false; } ImGui::EndPopup(); }
@@ -151,7 +147,7 @@ namespace Stellar {
         
         if (ImGui::InputText(
                 "Input", input_buffer.data(), input_buffer.size(), input_text_flags, [](ImGuiInputTextCallbackData *data) -> int {
-                    auto* console = reinterpret_cast<ImGuiConsole *>(data->UserData);
+                    auto* console = reinterpret_cast<LoggerPanel *>(data->UserData);
                     return console->on_text_edit(data);
                 },
                 reinterpret_cast<void *>(this))) {
@@ -165,7 +161,7 @@ namespace Stellar {
         if (reclaim_focus) { ImGui::SetKeyboardFocusHere(-1); }
         ImGui::End();
     }
-    void ImGuiConsole::exec_command(const char *command_line) {
+    void LoggerPanel::exec_command(const char *command_line) {
         add_log("# %s\n", command_line);
         history_pos = -1;
         for (usize i = history.size() - 1; i >= 0; i--) {
@@ -179,7 +175,7 @@ namespace Stellar {
         add_log("Unknown command: '%s'\n", command_line);
         scroll_to_bottom = true;
     }
-    auto ImGuiConsole::on_text_edit(ImGuiInputTextCallbackData *data) -> int {
+    auto LoggerPanel::on_text_edit(ImGuiInputTextCallbackData *data) -> int {
         switch (data->EventFlag) {
         case ImGuiInputTextFlags_CallbackCompletion: {
             const char *word_end = data->Buf + data->CursorPos;
@@ -256,7 +252,4 @@ namespace Stellar {
         }
         return 0;
     }
-/*};
-
-static inline ImGuiConsole imgui_console;*/
 }

@@ -6,6 +6,7 @@
 #include "panel/scene_hiearchy_panel.hpp"
 #include "panel/toolbar_panel.hpp"
 #include "panel/logger_panel.hpp"
+#include "panel/viewport_panel.hpp"
 
 #include <daxa/daxa.hpp>
 #include <daxa/pipeline.hpp>
@@ -35,6 +36,7 @@ namespace Stellar {
         void on_resize(u32 sx, u32 sy);
         void on_key(i32 key, i32 action);
         void on_mouse_move(f32 x, f32 y);
+        void on_mouse_button(i32 button, i32 action);
 
         Context context;
         std::shared_ptr<Stellar::Window> window;
@@ -43,8 +45,6 @@ namespace Stellar {
 
         u32 size_x;
         u32 size_y;
-        u32 viewport_size_x;
-        u32 viewport_size_y;
 
         daxa::ImageId render_image;
         daxa::ImageId depth_image;
@@ -56,7 +56,8 @@ namespace Stellar {
         std::unique_ptr<AssetBrowserPanel> asset_browser_panel;
         std::unique_ptr<ToolbarPanel> toolbar_panel;
         std::unique_ptr<PerformanceStatsPanel> performance_stats_panel;
-        std::unique_ptr<ImGuiConsole> logger_panel;
+        std::unique_ptr<LoggerPanel> logger_panel;
+        std::unique_ptr<ViewportPanel> viewport_panel;
 
         u32 FPS = 0;
         f32 deltaTime = 0;

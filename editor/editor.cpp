@@ -38,7 +38,8 @@ namespace Stellar {
         asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
         toolbar_panel = std::make_unique<ToolbarPanel>(window);
         performance_stats_panel = std::make_unique<PerformanceStatsPanel>();
-        logger_panel = std::make_unique<ImGuiConsole>();
+        logger_panel = std::make_unique<LoggerPanel>();
+        viewport_panel = std::make_unique<ViewportPanel>();
 
         glfwSetWindowUserPointer(window->glfw_window_ptr, this);
         glfwSetFramebufferSizeCallback(window->glfw_window_ptr, [](GLFWwindow * window_ptr, i32 w, i32 h) {
@@ -53,6 +54,10 @@ namespace Stellar {
             auto & app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
             app.on_key(key, action);
         });
+        glfwSetMouseButtonCallback(window->glfw_window_ptr, [](GLFWwindow * window_ptr, i32 button, i32 action, i32) {
+            auto & app = *reinterpret_cast<Editor *>(glfwGetWindowUserPointer(window_ptr));
+            app.on_mouse_button(button, action);
+        });
 
         ImGui_ImplGlfw_InitForVulkan(window->glfw_window_ptr, true);
         imgui_renderer =  daxa::ImGuiRenderer({
@@ -63,9 +68,6 @@ namespace Stellar {
 
         size_x = swapchain.get_surface_extent().x;
         size_y = swapchain.get_surface_extent().y;
-
-        viewport_size_x = swapchain.get_surface_extent().x;
-        viewport_size_y = swapchain.get_surface_extent().y;
 
         Logger::init();
         CORE_INFO("Test");
@@ -194,18 +196,13 @@ namespace Stellar {
         bool open = true;
         logger_panel->draw("Logger Panel", &open);
 
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::Begin("Viewport");
-        ImVec2 v = ImGui::GetContentRegionAvail();
-        if(v.x != static_cast<f32>(viewport_size_x) || v.y != static_cast<f32>(viewport_size_y)) {
-            viewport_size_x = static_cast<u32>(v.x);
-            viewport_size_y = static_cast<u32>(v.y);
-
+        viewport_panel->draw(render_image, window, scene_hiearchy_panel, editor_camera);
+        if(viewport_panel->should_resize) {
             context.device.destroy_image(render_image);
             render_image = context.device.create_image({
                 .format = daxa::Format::R8G8B8A8_UNORM,
                 .aspect = daxa::ImageAspectFlagBits::COLOR,
-                .size = { viewport_size_x, viewport_size_y, 1 },
+                .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
                 .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
                 .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
                 .debug_name = "render_image"
@@ -215,18 +212,14 @@ namespace Stellar {
             depth_image = context.device.create_image({
                 .format = daxa::Format::D32_SFLOAT,
                 .aspect = daxa::ImageAspectFlagBits::DEPTH,
-                .size = { viewport_size_x, viewport_size_y, 1 },
+                .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
                 .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
                 .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
                 .debug_name = "depth_image"
             });
 
-            editor_camera.camera.resize(static_cast<i32>(v.x), static_cast<i32>(v.y));
+            viewport_panel->should_resize = false;
         }
-
-        ImGui::Image(*reinterpret_cast<ImTextureID const *>(&render_image), ImGui::GetContentRegionAvail(), ImVec2 {});
-        ImGui::End();
-        ImGui::PopStyleVar();
 
         ImGui::Render();
     }
@@ -275,7 +268,7 @@ namespace Stellar {
                 .load_op = daxa::AttachmentLoadOp::CLEAR,
                 .clear_value = daxa::DepthValue{1.0f, 0},
             }},
-            .render_area = {.x = 0, .y = 0, .width = viewport_size_x, .height = viewport_size_y},
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x, .height = viewport_panel->viewport_size_y},
         });
  
         cmd_list.set_pipeline(*depth_prepass_pipeline);
@@ -287,7 +280,6 @@ namespace Stellar {
                 if(!mc.model) { return; }
 
                 DepthPrepassPush draw_push;
-                //draw_push.mvp = *reinterpret_cast<daxa::types::f32mat4x4*>(&mvp);
                 draw_push.camera_info = context.device.get_device_address(editor_camera_buffer);
                 draw_push.transform_buffer = context.device.get_device_address(tc.transform_buffer);
                 mc.model->draw(cmd_list, draw_push);
@@ -307,7 +299,7 @@ namespace Stellar {
                 .load_op = daxa::AttachmentLoadOp::LOAD,
                 .clear_value = daxa::DepthValue{1.0f, 0},
             }},
-            .render_area = {.x = 0, .y = 0, .width = viewport_size_x, .height = viewport_size_y},
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x, .height = viewport_panel->viewport_size_y},
         });
  
         cmd_list.set_pipeline(*raster_pipeline);
@@ -387,25 +379,20 @@ namespace Stellar {
     }
 
     void Editor::on_key(i32 key, i32 action) {
-        if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-            if(toolbar_panel->scene_state == SceneState::Play) {
-                window->set_mouse_capture(false);
-            }
-            toolbar_panel->scene_state = SceneState::Edit;
-        }
-
-        if (toolbar_panel->scene_state == SceneState::Play) {
+        if (viewport_panel->should_play) {
             editor_camera.on_key(key, action);
         }
     }
 
     void Editor::on_mouse_move(f32 x, f32 y) {
-        if (toolbar_panel->scene_state == SceneState::Play) {
-            f32 center_x = static_cast<f32>(size_x / 2);
-            f32 center_y = static_cast<f32>(size_y / 2);
-            auto offset = glm::vec2{x - center_x, center_y - y};
-            editor_camera.on_mouse_move(offset.x, offset.y);
-            window->set_mouse_position(center_x, center_y);
+        viewport_panel->mouse_pos = { x, y };
+    }
+
+    void Editor::on_mouse_button(i32 button, i32 action) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+            viewport_panel->mouse_pressed = true;
+        } else {
+            viewport_panel->mouse_pressed = false;
         }
     }
 }

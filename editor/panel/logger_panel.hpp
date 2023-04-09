@@ -6,7 +6,7 @@
 #include <imgui.h>
 
 namespace Stellar {
-    struct ImGuiConsole {
+    struct LoggerPanel {
         std::array<char, 1024> input_buffer;
         std::vector<char *> items;
         std::vector<const char *> commands;
@@ -16,8 +16,8 @@ namespace Stellar {
         bool auto_scroll;
         bool scroll_to_bottom;
 
-        ImGuiConsole();
-        ~ImGuiConsole();
+        LoggerPanel();
+        ~LoggerPanel();
 
         static auto Stricmp(const char *s1, const char *s2) -> int;
         static auto Strnicmp(const char *s1, const char *s2, int n) -> int;
