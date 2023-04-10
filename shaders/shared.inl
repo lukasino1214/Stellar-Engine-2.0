@@ -109,7 +109,11 @@ struct DepthPrepassPush {
     daxa_BufferPtr(TransformInfo) transform_buffer;
 };
 
-
+struct BillboardPush {
+    daxa_f32vec3 position;
+    daxa_BufferPtr(CameraInfo) camera_info;
+    TextureId texture;
+};
 
 #define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)
 

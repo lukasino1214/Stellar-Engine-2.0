@@ -44,14 +44,14 @@ namespace Stellar {
         if(scene_state == SceneState::Edit) {
             if (ImGui::Button("play", ImVec2(size * 2.5f, size))) {
                 scene_state = SceneState::Play;
-                window->set_mouse_capture(true);
+                //window->set_mouse_capture(true);
             }
         }
 
         if(scene_state == SceneState::Play) {
             if (ImGui::Button("edit", ImVec2(size * 2.5f, size))) {
                 scene_state = SceneState::Edit;
-                window->set_mouse_capture(false);
+                //window->set_mouse_capture(false);
             }
         }
 

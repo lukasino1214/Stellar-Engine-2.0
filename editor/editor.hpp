@@ -51,6 +51,7 @@ namespace Stellar {
 
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
         std::shared_ptr<daxa::RasterPipeline> raster_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;
         std::unique_ptr<AssetBrowserPanel> asset_browser_panel;
@@ -58,6 +59,10 @@ namespace Stellar {
         std::unique_ptr<PerformanceStatsPanel> performance_stats_panel;
         std::unique_ptr<LoggerPanel> logger_panel;
         std::unique_ptr<ViewportPanel> viewport_panel;
+
+        std::unique_ptr<Texture> directional_light_texture;
+        std::unique_ptr<Texture> point_light_texture;
+        std::unique_ptr<Texture> spot_light_texture;
 
         u32 FPS = 0;
         f32 deltaTime = 0;

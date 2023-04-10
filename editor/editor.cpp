@@ -121,6 +121,22 @@ namespace Stellar {
             .debug_name = "raster_pipeline",
         }).value();
 
+        billboard_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"billboard.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"billboard.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_UNORM }},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE
+            },
+            .push_constant_size = sizeof(BillboardPush),
+            .debug_name = "billboard_pipeline",
+        }).value();
+
         editor_camera.camera.resize(size_x, size_y);
 
         Entity e = scene->create_entity("Directional Light");
@@ -132,6 +148,10 @@ namespace Stellar {
             .size = sizeof(CameraInfo),
             .debug_name = "editor camera buffer"
         });
+
+        directional_light_texture = std::make_unique<Texture>(context.device, "directional_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
+        point_light_texture = std::make_unique<Texture>(context.device, "point_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
+        spot_light_texture = std::make_unique<Texture>(context.device, "spot_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
     }
 
     Editor::~Editor() {
@@ -317,6 +337,54 @@ namespace Stellar {
                 mc.model->draw(cmd_list, draw_push);
             }
         });
+
+        cmd_list.set_pipeline(*billboard_pipeline); 
+        
+        scene->iterate([&](Entity entity){
+            daxa::ImageId image_id;
+            daxa::SamplerId sampler_id;
+            bool is_light = false;
+            
+            if(entity.has_component<DirectionalLightComponent>()) {
+                image_id = directional_light_texture->image_id;
+                sampler_id = directional_light_texture->sampler_id;
+                is_light = true;
+            }
+
+            if(entity.has_component<PointLightComponent>()) {
+                image_id = point_light_texture->image_id;
+                sampler_id = point_light_texture->sampler_id;
+                is_light = true;
+            }
+
+            if(entity.has_component<SpotLightComponent>()) {
+                image_id = spot_light_texture->image_id;
+                sampler_id = spot_light_texture->sampler_id;
+                is_light = true;
+            }
+
+            if(!is_light) { return; }
+
+            auto& tc = entity.get_component<TransformComponent>();
+            cmd_list.push_constant(BillboardPush {
+                .position = *reinterpret_cast<f32vec3*>(&tc.position),
+                .camera_info = context.device.get_device_address(editor_camera_buffer),
+                .texture = {
+                    .texture_id = image_id.default_view(),
+                    .sampler_id = sampler_id
+                }
+            });
+
+            cmd_list.draw({ .vertex_count = 6 });
+        });
+
+        /*cmd_list.push_constant(BillboardPush {
+            .position = { 0.0f, 10.0f, 0.0f },
+            .camera_info = context.device.get_device_address(editor_camera_buffer),
+            .texture = {}
+        });*/
+
+        cmd_list.draw({ .vertex_count = 6 });
 
         cmd_list.end_renderpass();
 

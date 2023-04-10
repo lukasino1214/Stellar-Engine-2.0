@@ -47,7 +47,7 @@ namespace Stellar {
         }
 
         Entity selected_entity = scene_hiearchy_panel->selected_entity;
-        if (selected_entity && gizmo_type != -1) {
+        if (selected_entity && gizmo_type != -1 && selected_entity.has_component<TransformComponent>()) {
             ImGuizmo::SetOrthographic(false);
             ImGuizmo::SetDrawlist();
 

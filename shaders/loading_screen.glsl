@@ -20,7 +20,7 @@ layout(location = 0) in f32vec2 in_uv;
 layout(location = 0) out f32vec4 out_color;
 
 void main() {
-    out_color = vec4(texture(daxa_push_constant.texture, daxa_push_constant.texture_sampler, in_uv).rrr, 1.0);
+    out_color = vec4(texture(daxa_push_constant.texture, daxa_push_constant.texture_sampler, in_uv).rgb, 1.0);
 }
 
 #endif
