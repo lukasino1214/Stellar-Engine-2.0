@@ -72,6 +72,24 @@ namespace Stellar {
         Logger::init();
         CORE_INFO("Test");
 
+        albedo_image = context.device.create_image({
+            .format = daxa::Format::R8G8B8A8_UNORM,
+            .aspect = daxa::ImageAspectFlagBits::COLOR,
+            .size = { size_x, size_y, 1 },
+            .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .debug_name = "albedo_image"
+        });
+
+        normal_image = context.device.create_image({
+            .format = daxa::Format::R16G16B16A16_SFLOAT,
+            .aspect = daxa::ImageAspectFlagBits::COLOR,
+            .size = { size_x, size_y, 1 },
+            .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .debug_name = "normal_image"
+        });
+
         render_image = context.device.create_image({
             .format = daxa::Format::R8G8B8A8_UNORM,
             .aspect = daxa::ImageAspectFlagBits::COLOR,
@@ -102,13 +120,16 @@ namespace Stellar {
                 .face_culling = daxa::FaceCullFlagBits::FRONT_BIT
             },
             .push_constant_size = sizeof(DepthPrepassPush),
-            .debug_name = "raster_pipeline",
+            .debug_name = "depth_prepass_pipeline",
         }).value();
 
-        raster_pipeline = context.pipeline_manager.add_raster_pipeline({
-            .vertex_shader_info = {.source = daxa::ShaderFile{"draw.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
-            .fragment_shader_info = {.source = daxa::ShaderFile{"draw.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
-            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_UNORM }},
+        deffered_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"deffered.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"deffered.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {
+                { .format = daxa::Format::R8G8B8A8_UNORM },
+                { .format = daxa::Format::R16G16B16A16_SFLOAT }
+            },
             .depth_test = {
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
                 .enable_depth_test = true,
@@ -118,7 +139,20 @@ namespace Stellar {
                 .face_culling = daxa::FaceCullFlagBits::FRONT_BIT
             },
             .push_constant_size = sizeof(DrawPush),
-            .debug_name = "raster_pipeline",
+            .debug_name = "deffered_pipeline",
+        }).value();
+
+        composition_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"composition.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"composition.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {
+                { .format = daxa::Format::R8G8B8A8_UNORM },
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE
+            },
+            .push_constant_size = sizeof(CompositionPush),
+            .debug_name = "composition_pipeline",
         }).value();
 
         billboard_pipeline = context.pipeline_manager.add_raster_pipeline({
@@ -152,6 +186,23 @@ namespace Stellar {
         directional_light_texture = std::make_unique<Texture>(context.device, "directional_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
         point_light_texture = std::make_unique<Texture>(context.device, "point_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
         spot_light_texture = std::make_unique<Texture>(context.device, "spot_light_icon.png", daxa::Format::R8G8B8A8_SRGB);
+    
+        sampler = context.device.create_sampler({
+            .magnification_filter = daxa::Filter::LINEAR,
+            .minification_filter = daxa::Filter::LINEAR,
+            .mipmap_filter = daxa::Filter::LINEAR,
+            .address_mode_u = daxa::SamplerAddressMode::CLAMP_TO_EDGE,
+            .address_mode_v = daxa::SamplerAddressMode::CLAMP_TO_EDGE,
+            .address_mode_w = daxa::SamplerAddressMode::CLAMP_TO_EDGE,
+            .mip_lod_bias = 0.0f,
+            .enable_anisotropy = true,
+            .max_anisotropy = 16.0f,
+            .enable_compare = false,
+            .compare_op = daxa::CompareOp::ALWAYS,
+            .min_lod = 0.0f,
+            .max_lod = static_cast<f32>(1),
+            .enable_unnormalized_coordinates = false,
+        });
     }
 
     Editor::~Editor() {
@@ -159,6 +210,9 @@ namespace Stellar {
 
         context.device.wait_idle();
         context.device.collect_garbage();
+        context.device.destroy_sampler(sampler);
+        context.device.destroy_image(albedo_image);
+        context.device.destroy_image(normal_image);
         context.device.destroy_image(render_image);
         context.device.destroy_image(depth_image);
         context.device.destroy_buffer(editor_camera_buffer);
@@ -218,6 +272,26 @@ namespace Stellar {
 
         viewport_panel->draw(render_image, window, scene_hiearchy_panel, editor_camera);
         if(viewport_panel->should_resize) {
+            context.device.destroy_image(albedo_image);
+            albedo_image = context.device.create_image({
+                .format = daxa::Format::R8G8B8A8_UNORM,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "albedo_image"
+            });
+
+            context.device.destroy_image(normal_image);
+            normal_image = context.device.create_image({
+                .format = daxa::Format::R16G16B16A16_SFLOAT,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .debug_name = "normal_image"
+            });
+
             context.device.destroy_image(render_image);
             render_image = context.device.create_image({
                 .format = daxa::Format::R8G8B8A8_UNORM,
@@ -233,7 +307,7 @@ namespace Stellar {
                 .format = daxa::Format::D32_SFLOAT,
                 .aspect = daxa::ImageAspectFlagBits::DEPTH,
                 .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
-                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT,
+                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
                 .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
                 .debug_name = "depth_image"
             });
@@ -282,6 +356,28 @@ namespace Stellar {
             .image_id = render_image
         });
 
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::GENERAL,
+            .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+            .image_id = depth_image,
+        });
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = albedo_image
+        });
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = normal_image
+        });
+
         cmd_list.begin_renderpass({
             .depth_attachment = {{
                 .image_view = depth_image.default_view(),
@@ -308,12 +404,21 @@ namespace Stellar {
 
         cmd_list.end_renderpass();
 
+
+
         cmd_list.begin_renderpass({
-            .color_attachments = {{
-                .image_view = render_image.default_view(),
-                .load_op = daxa::AttachmentLoadOp::CLEAR,
-                .clear_value = std::array<daxa::f32, 4>{0.2f, 0.4f, 1.0f, 1.0f},
-            }},
+            .color_attachments = {
+                {
+                    .image_view = this->albedo_image.default_view(),
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<f32, 4>{0.05f, 0.05f, 0.05f, 1.0f},
+                },
+                {
+                    .image_view = this->normal_image.default_view(),
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<f32, 4>{0.0f, 0.0f, 0.0f, 1.0f},
+                },
+            },
             .depth_attachment = {{
                 .image_view = depth_image.default_view(),
                 .load_op = daxa::AttachmentLoadOp::LOAD,
@@ -322,7 +427,7 @@ namespace Stellar {
             .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x, .height = viewport_panel->viewport_size_y},
         });
  
-        cmd_list.set_pipeline(*raster_pipeline);
+        cmd_list.set_pipeline(*deffered_pipeline);
 
         scene->iterate([&](Entity entity){
             if(entity.has_component<ModelComponent>()) {
@@ -336,6 +441,50 @@ namespace Stellar {
                 draw_push.light_buffer = context.device.get_device_address(scene->light_buffer);
                 mc.model->draw(cmd_list, draw_push);
             }
+        });
+
+        cmd_list.end_renderpass();
+
+
+
+        cmd_list.begin_renderpass({
+            .color_attachments = {
+                {
+                    .image_view = this->render_image.default_view(),
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<f32, 4>{0.05f, 0.05f, 0.05f, 1.0f},
+                },
+            },
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x, .height = viewport_panel->viewport_size_y},
+        });
+
+        cmd_list.set_pipeline(*composition_pipeline);
+        cmd_list.push_constant(CompositionPush {
+            .albedo = { .texture_id = albedo_image.default_view(), .sampler_id = sampler },
+            .normal = { .texture_id = normal_image.default_view(), .sampler_id = sampler },
+            //.emissive = { .image_view_id = emissive_image.default_view(), .sampler_id = sampler },
+            .depth = { .texture_id = depth_image.default_view(), .sampler_id = sampler },
+            //.ssao = { .image_view_id = ssao_renderer->ssao_blur_image.default_view(), .sampler_id = sampler },
+            .light_buffer = context.device.get_device_address(scene->light_buffer),
+            .camera_info = context.device.get_device_address(editor_camera_buffer),
+        });
+
+        cmd_list.draw({ .vertex_count = 3 });
+        cmd_list.end_renderpass();
+
+
+        cmd_list.begin_renderpass({
+            .color_attachments = {{
+                .image_view = render_image.default_view(),
+                .load_op = daxa::AttachmentLoadOp::LOAD,
+                .clear_value = std::array<daxa::f32, 4>{0.2f, 0.4f, 1.0f, 1.0f},
+            }},
+            .depth_attachment = {{
+                .image_view = depth_image.default_view(),
+                .load_op = daxa::AttachmentLoadOp::LOAD,
+                .clear_value = daxa::DepthValue{1.0f, 0},
+            }},
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x, .height = viewport_panel->viewport_size_y},
         });
 
         cmd_list.set_pipeline(*billboard_pipeline); 
@@ -377,14 +526,6 @@ namespace Stellar {
 
             cmd_list.draw({ .vertex_count = 6 });
         });
-
-        /*cmd_list.push_constant(BillboardPush {
-            .position = { 0.0f, 10.0f, 0.0f },
-            .camera_info = context.device.get_device_address(editor_camera_buffer),
-            .texture = {}
-        });*/
-
-        cmd_list.draw({ .vertex_count = 6 });
 
         cmd_list.end_renderpass();
 

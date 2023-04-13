@@ -46,11 +46,16 @@ namespace Stellar {
         u32 size_x;
         u32 size_y;
 
+        daxa::ImageId albedo_image;
+        daxa::ImageId normal_image;
         daxa::ImageId render_image;
         daxa::ImageId depth_image;
 
+        daxa::SamplerId sampler;
+
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
-        std::shared_ptr<daxa::RasterPipeline> raster_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> deffered_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> composition_pipeline;
         std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;

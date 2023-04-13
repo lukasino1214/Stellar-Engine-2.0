@@ -115,6 +115,14 @@ struct BillboardPush {
     TextureId texture;
 };
 
+struct CompositionPush {
+    TextureId albedo;
+    TextureId normal;
+    TextureId depth;
+    daxa_RWBufferPtr(LightBuffer) light_buffer;
+    daxa_RWBufferPtr(CameraInfo) camera_info;
+};
+
 #define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)
 
 #define MATERIAL deref(daxa_push_constant.material_buffer[daxa_push_constant.material_index])
