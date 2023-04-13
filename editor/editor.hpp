@@ -50,6 +50,8 @@ namespace Stellar {
         daxa::ImageId normal_image;
         daxa::ImageId render_image;
         daxa::ImageId depth_image;
+        daxa::ImageId ssao_image;
+        daxa::ImageId ssao_blur_image;
 
         daxa::SamplerId sampler;
 
@@ -57,6 +59,9 @@ namespace Stellar {
         std::shared_ptr<daxa::RasterPipeline> deffered_pipeline;
         std::shared_ptr<daxa::RasterPipeline> composition_pipeline;
         std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> ssao_generation_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> ssao_blur_pipeline;
+
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;
         std::unique_ptr<AssetBrowserPanel> asset_browser_panel;

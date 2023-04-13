@@ -108,6 +108,22 @@ namespace Stellar {
             .debug_name = "depth_image"
         });
 
+        this->ssao_image = context.device.create_image({
+            .format = daxa::Format::R8_UNORM,
+            .aspect = daxa::ImageAspectFlagBits::COLOR,
+            .size = { size_x / 2, size_y / 2, 1 },
+            .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+            .debug_name = "ssao_image"
+        });
+
+        this->ssao_blur_image = context.device.create_image({
+            .format = daxa::Format::R8_UNORM,
+            .aspect = daxa::ImageAspectFlagBits::COLOR,
+            .size = { size_x / 2, size_y / 2, 1 },
+            .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+            .debug_name = "ssao_blur_image"
+        });
+
         depth_prepass_pipeline = context.pipeline_manager.add_raster_pipeline({
             .vertex_shader_info = {.source = daxa::ShaderFile{"depth_prepass.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
             .fragment_shader_info = {.source = daxa::ShaderFile{"depth_prepass.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
@@ -171,6 +187,24 @@ namespace Stellar {
             .debug_name = "billboard_pipeline",
         }).value();
 
+        this->ssao_generation_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = { .source = daxa::ShaderFile{"ssao_generation.glsl"}, .compile_options = { .defines = { daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = { .source = daxa::ShaderFile{"ssao_generation.glsl"}, .compile_options = { .defines = { daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = { { .format = daxa::Format::R8_UNORM, } },
+            .raster = { .polygon_mode = daxa::PolygonMode::FILL, },
+            .push_constant_size = sizeof(SSAOGenerationPush),
+            .debug_name = "ssao_generation_code",
+        }).value();
+
+        this->ssao_blur_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = { .source = daxa::ShaderFile{"ssao_blur.glsl"}, .compile_options = { .defines = { daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = { .source = daxa::ShaderFile{"ssao_blur.glsl"}, .compile_options = { .defines = { daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = { { .format = daxa::Format::R8_UNORM, } },
+            .raster = { .polygon_mode = daxa::PolygonMode::FILL, },
+            .push_constant_size = sizeof(SSAOBlurPush),
+            .debug_name = "ssao_blur_pipeline",
+        }).value();
+
         editor_camera.camera.resize(size_x, size_y);
 
         Entity e = scene->create_entity("Directional Light");
@@ -215,6 +249,8 @@ namespace Stellar {
         context.device.destroy_image(normal_image);
         context.device.destroy_image(render_image);
         context.device.destroy_image(depth_image);
+        context.device.destroy_image(ssao_image);
+        context.device.destroy_image(ssao_blur_image);
         context.device.destroy_buffer(editor_camera_buffer);
     }
 
@@ -312,6 +348,24 @@ namespace Stellar {
                 .debug_name = "depth_image"
             });
 
+            context.device.destroy_image(ssao_image);
+            this->ssao_image = context.device.create_image({
+                .format = daxa::Format::R8_UNORM,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { viewport_panel->viewport_size_x / 2, viewport_panel->viewport_size_y / 2, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                .debug_name = "ssao_image"
+            });
+
+            context.device.destroy_image(ssao_blur_image);
+            this->ssao_blur_image = context.device.create_image({
+                .format = daxa::Format::R8_UNORM,
+                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                .size = { viewport_panel->viewport_size_x / 2, viewport_panel->viewport_size_y / 2, 1 },
+                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                .debug_name = "ssao_blur_image"
+            });
+
             viewport_panel->should_resize = false;
         }
 
@@ -376,6 +430,20 @@ namespace Stellar {
             .before_layout = daxa::ImageLayout::UNDEFINED,
             .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
             .image_id = normal_image
+        });
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = ssao_image
+        });
+
+        cmd_list.pipeline_barrier_image_transition({
+            .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+            .before_layout = daxa::ImageLayout::UNDEFINED,
+            .after_layout = daxa::ImageLayout::ATTACHMENT_OPTIMAL,
+            .image_id = ssao_blur_image
         });
 
         cmd_list.begin_renderpass({
@@ -445,7 +513,39 @@ namespace Stellar {
 
         cmd_list.end_renderpass();
 
-
+        cmd_list.begin_renderpass({
+            .color_attachments = {{
+                    .image_view = this->ssao_image.default_view(),
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<f32, 4>{1.0f, 0.0f, 0.0f, 1.0f},
+            }},
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x / 2, .height = viewport_panel->viewport_size_y / 2},
+        });
+        cmd_list.set_pipeline(*ssao_generation_pipeline);
+        cmd_list.push_constant(SSAOGenerationPush {
+            .normal = { .texture_id = normal_image.default_view(), .sampler_id = sampler },
+            .depth = { .texture_id = depth_image.default_view(), .sampler_id = sampler },
+            .camera_info = context.device.get_device_address(editor_camera_buffer)
+        });
+        cmd_list.draw({ .vertex_count = 3 });
+        cmd_list.end_renderpass();
+    // SSAO blur
+        cmd_list.begin_renderpass({
+            .color_attachments = {
+                {
+                    .image_view = this->ssao_blur_image.default_view(),
+                    .load_op = daxa::AttachmentLoadOp::CLEAR,
+                    .clear_value = std::array<f32, 4>{0.0f, 0.0f, 0.0f, 1.0f},
+                },
+            },
+            .render_area = {.x = 0, .y = 0, .width = viewport_panel->viewport_size_x / 2, .height = viewport_panel->viewport_size_y / 2},
+        });
+        cmd_list.set_pipeline(*ssao_blur_pipeline);
+        cmd_list.push_constant(SSAOBlurPush {
+            .ssao = { .texture_id = ssao_image.default_view(), .sampler_id = sampler },
+        });
+        cmd_list.draw({ .vertex_count = 3 });
+        cmd_list.end_renderpass();
 
         cmd_list.begin_renderpass({
             .color_attachments = {
@@ -462,9 +562,8 @@ namespace Stellar {
         cmd_list.push_constant(CompositionPush {
             .albedo = { .texture_id = albedo_image.default_view(), .sampler_id = sampler },
             .normal = { .texture_id = normal_image.default_view(), .sampler_id = sampler },
-            //.emissive = { .image_view_id = emissive_image.default_view(), .sampler_id = sampler },
             .depth = { .texture_id = depth_image.default_view(), .sampler_id = sampler },
-            //.ssao = { .image_view_id = ssao_renderer->ssao_blur_image.default_view(), .sampler_id = sampler },
+            .ssao = { .texture_id = ssao_blur_image.default_view(), .sampler_id = sampler },
             .light_buffer = context.device.get_device_address(scene->light_buffer),
             .camera_info = context.device.get_device_address(editor_camera_buffer),
         });

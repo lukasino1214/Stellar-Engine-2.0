@@ -108,6 +108,7 @@ void main() {
     f32vec3 ambient = f32vec3(0.05);
     
     ambient *= color.rgb;
+    ambient *= sample_texture(daxa_push_constant.ssao, in_uv).r;
 
     f32vec4 position = f32vec4(get_world_position_from_depth(in_uv, sample_texture(daxa_push_constant.depth, in_uv).r), 1.0);
     

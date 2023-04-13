@@ -119,8 +119,19 @@ struct CompositionPush {
     TextureId albedo;
     TextureId normal;
     TextureId depth;
+    TextureId ssao;
     daxa_RWBufferPtr(LightBuffer) light_buffer;
     daxa_RWBufferPtr(CameraInfo) camera_info;
+};
+
+struct SSAOGenerationPush {
+    TextureId normal;
+    TextureId depth;
+    daxa_RWBufferPtr(CameraInfo) camera_info;
+};
+
+struct SSAOBlurPush {
+    TextureId ssao;
 };
 
 #define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)
