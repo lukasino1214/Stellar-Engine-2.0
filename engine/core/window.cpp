@@ -65,7 +65,7 @@ namespace Stellar {
     }
 
     void Window::open() {
-        if(window_count == 0) { glfwInit(); }
+        if(window_count == 0) { glfwInit(); glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); }
         window_count.fetch_add(1);
         
         glfw_window_ptr = glfwCreateWindow(width, height, name.data(), nullptr, nullptr);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <entt/entity/fwd.hpp>
 #include <entt/entt.hpp>
 
 #include <data/components.hpp>
@@ -8,11 +7,13 @@
 
 #include <functional>
 
+#include <daxa/utils/pipeline_manager.hpp>
+
 namespace Stellar {
     struct Entity;
 
     struct Scene {
-        explicit Scene(const std::string_view& _name, daxa::Device _device);
+        explicit Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager);
         ~Scene();
 
         auto create_entity(const std::string_view& _name) -> Entity;
@@ -34,5 +35,11 @@ namespace Stellar {
         daxa::Device device;
 
         daxa::BufferId light_buffer;
+
+        std::shared_ptr<daxa::RasterPipeline> normal_shadow_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> variance_shadow_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> filter_gauss_pipeline;
+
+        daxa::SamplerId pcf_sampler;
     };
 }

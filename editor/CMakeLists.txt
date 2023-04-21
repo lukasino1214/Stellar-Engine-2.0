@@ -15,5 +15,4 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 set_project_warnings(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE daxa::daxa)
-#target_link_libraries(${PROJECT_NAME} PRIVATE imguizmo::imguizmo)
 target_link_libraries(${PROJECT_NAME} PRIVATE Engine)

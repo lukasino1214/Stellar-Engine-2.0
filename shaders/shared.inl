@@ -44,6 +44,8 @@ struct DirectionalLight {
     daxa_f32vec3 direction;
     daxa_f32vec3 color;
     daxa_f32 intensity;
+    TextureId shadow_image;
+    daxa_f32mat4x4 light_matrix;
 };
 
 struct PointLight {
@@ -59,6 +61,8 @@ struct SpotLight {
     daxa_f32 intensity;
     daxa_f32 cut_off;
     daxa_f32 outer_cut_off;
+    TextureId shadow_image;
+    daxa_f32mat4x4 light_matrix;
 };
 
 #define MAX_LIGHTS 128
@@ -122,6 +126,7 @@ struct CompositionPush {
     TextureId ssao;
     daxa_RWBufferPtr(LightBuffer) light_buffer;
     daxa_RWBufferPtr(CameraInfo) camera_info;
+    daxa_f32 ambient;
 };
 
 struct SSAOGenerationPush {
@@ -132,6 +137,30 @@ struct SSAOGenerationPush {
 
 struct SSAOBlurPush {
     TextureId ssao;
+};
+
+struct SimpleVertex {
+    daxa_f32vec3 position;
+};
+
+DAXA_ENABLE_BUFFER_PTR(SimpleVertex)
+
+struct SkyPush {
+    daxa_RWBufferPtr(SimpleVertex) vertex_buffer;
+    daxa_f32mat4x4 model_matrix;
+    daxa_f32vec3 sun_position;
+    daxa_RWBufferPtr(CameraInfo) camera_info;
+};
+
+struct ShadowPush {
+    daxa_f32mat4x4 light_matrix;
+    daxa_RWBufferPtr(Vertex) vertex_buffer;
+    daxa_RWBufferPtr(TransformInfo) transform_buffer;
+};
+
+struct GaussPush {
+    TextureId src_texture;
+    daxa_f32vec2 blur_scale;
 };
 
 #define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)

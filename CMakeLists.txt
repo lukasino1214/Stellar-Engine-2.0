@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
+project(all)
 
 include(cmake/warnings.cmake)
 include(cmake/static_analysis.cmake)

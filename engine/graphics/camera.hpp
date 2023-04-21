@@ -2,6 +2,7 @@
 
 #include <core/types.hpp>
 
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 namespace Stellar {
@@ -47,9 +48,9 @@ namespace Stellar {
         input::Keybinds keybinds = input::DEFAULT_KEYBINDS;
         glm::vec3 position{ 0.0f, 0.0f, 0.0f };
         glm::vec3 velocity{ 0.0f, 0.0f, 0.0f };
-        glm::vec3 rotation{ 0.0f, 0.0f, 0.0f };
+        glm::vec3 rotation{ 0.0001f, 0.0001f, 0.0001f };
 
-        f32 speed = 30.0f, mouse_sens = 0.25f;
+        f32 speed = 10.0f, mouse_sens = 0.25f;
         f32 sprint_speed = 8.0f;
         f32 sin_rot_x = 0, cos_rot_x = 1;
 

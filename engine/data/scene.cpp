@@ -81,13 +81,78 @@ YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec4 &v) {
 }
 
 namespace Stellar {
-    Scene::Scene(const std::string_view& _name, daxa::Device _device) : name{_name}, device{_device} {
+    Scene::Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager) : name{_name}, device{_device} {
         registry = std::make_unique<entt::registry>();
 
         light_buffer = device.create_buffer({
             .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
             .size = sizeof(LightBuffer),
             .debug_name = "light buffer",
+        });
+
+        normal_shadow_pipeline = pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"normal_shadow.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"normal_shadow.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D16_UNORM,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE,
+            },
+            .push_constant_size = sizeof(ShadowPush),
+            .debug_name = "normal_shadow_pipeline",
+        }).value();
+
+        variance_shadow_pipeline = pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"variance_shadow.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"variance_shadow.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {
+                { .format = daxa::Format::R16G16_UNORM },
+            },
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D16_UNORM,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE,
+            },
+            .push_constant_size = sizeof(ShadowPush),
+            .debug_name = "variance_shadow_pipeline",
+        }).value();
+
+        filter_gauss_pipeline = pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"filter_gauss.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"filter_gauss.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {
+                { .format = daxa::Format::R16G16_UNORM },
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE,
+            },
+            .push_constant_size = sizeof(GaussPush),
+            .debug_name = "filter_gauss_pipeline",
+        }).value();
+
+        pcf_sampler = this->device.create_sampler({
+            .magnification_filter = daxa::Filter::LINEAR,
+            .minification_filter = daxa::Filter::LINEAR,
+            .mipmap_filter = daxa::Filter::LINEAR,
+            .address_mode_u = daxa::SamplerAddressMode::CLAMP_TO_BORDER,
+            .address_mode_v = daxa::SamplerAddressMode::CLAMP_TO_BORDER,
+            .address_mode_w = daxa::SamplerAddressMode::CLAMP_TO_BORDER,
+            .mip_lod_bias = 0.0f,
+            .enable_anisotropy = true,
+            .max_anisotropy = 16.0f,
+            .enable_compare = true,
+            .compare_op = daxa::CompareOp::LESS,
+            .min_lod = 0.0f,
+            .max_lod = static_cast<f32>(1),
+            .border_color = daxa::BorderColor::FLOAT_OPAQUE_WHITE,
+            .enable_unnormalized_coordinates = false,
         });
     }
 
@@ -99,7 +164,31 @@ namespace Stellar {
                     device.destroy_buffer(tc.transform_buffer);
                 }
             }
+
+            if(entity.has_component<DirectionalLightComponent>()) {
+                auto& lc = entity.get_component<DirectionalLightComponent>();
+                if(!lc.shadow_info.shadow_image.is_empty()) {
+                    device.destroy_image(lc.shadow_info.shadow_image);
+                }
+            }
+
+            if(entity.has_component<SpotLightComponent>()) {
+                auto& lc = entity.get_component<SpotLightComponent>();
+                if(!lc.shadow_info.shadow_image.is_empty()) {
+                    device.destroy_image(lc.shadow_info.shadow_image);
+                }
+
+                if(!lc.shadow_info.depth_image.is_empty()) {
+                    device.destroy_image(lc.shadow_info.depth_image);
+                }
+
+                if(!lc.shadow_info.temp_shadow_image.is_empty()) {
+                    device.destroy_image(lc.shadow_info.temp_shadow_image);
+                }
+            }
         });
+
+        device.destroy_sampler(pcf_sampler);
 
         device.destroy_buffer(light_buffer);
     }
@@ -434,14 +523,37 @@ namespace Stellar {
                         auto& temp_light = temp_light_buffer.directional_lights[temp_light_buffer.num_directional_lights];
 
                         glm::vec3 rot = tc.rotation;
-                        glm::vec3 dir = { 0.0f, 1.0f, 0.0f };
+                        glm::vec3 dir = { 0.0f, -1.0f, 0.0f };
                         dir = glm::rotateX(dir, glm::radians(rot.x));
                         dir = glm::rotateY(dir, glm::radians(rot.y));
                         dir = glm::rotateZ(dir, glm::radians(rot.z));
 
+                        f32 clip_space = light.shadow_info.clip_space;
+                        light.shadow_info.projection = glm::ortho(-clip_space, clip_space, -clip_space, clip_space, -clip_space, clip_space);
+
+                        glm::vec3 pos = entity.get_component<TransformComponent>().position;
+
+                        glm::vec3 look_pos = pos + dir;
+                        light.shadow_info.view = glm::lookAt(pos, look_pos, glm::vec3(0.0, -1.0, 0.0));
+
+                        if(light.shadow_info.shadow_image.is_empty()) {
+                            light.shadow_info.shadow_image = device.create_image({
+                                .format = daxa::Format::D16_UNORM,
+                                .aspect = daxa::ImageAspectFlagBits::DEPTH,
+                                .size = {static_cast<u32>(light.shadow_info.image_size.x), static_cast<u32>(light.shadow_info.image_size.y), 1},
+                                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                            });
+                        }
+
                         temp_light.direction = *reinterpret_cast<const f32vec3 *>(&dir);
                         temp_light.color = *reinterpret_cast<const f32vec3 *>(&light.color);
                         temp_light.intensity = light.intensity;
+
+                        temp_light.shadow_image = TextureId { .texture_id = light.shadow_info.shadow_image.default_view(), .sampler_id = pcf_sampler };
+
+                        glm::mat4 light_matrix = light.shadow_info.projection * light.shadow_info.view;
+
+                        temp_light.light_matrix = *reinterpret_cast<const f32mat4x4*>(&light_matrix);
 
                         temp_light_buffer.num_directional_lights++;
                     }
@@ -462,10 +574,43 @@ namespace Stellar {
                         auto& temp_light = temp_light_buffer.spot_lights[temp_light_buffer.num_spot_lights];
 
                         glm::vec3 rot = tc.rotation;
-                        glm::vec3 dir = { 0.0f, 1.0f, 0.0f };
+                        glm::vec3 dir = { 0.0f, -1.0f, 0.0f };
                         dir = glm::rotateX(dir, glm::radians(rot.x));
                         dir = glm::rotateY(dir, glm::radians(rot.y));
                         dir = glm::rotateZ(dir, glm::radians(rot.z));
+
+                        f32 clip_space = light.shadow_info.clip_space;
+
+                        light.shadow_info.projection = glm::perspective(glm::radians(light.outer_cut_off), 1.0f, 0.1f, clip_space);
+                        light.shadow_info.projection[1][1] *= -1.0f;
+
+                        glm::vec3 pos = entity.get_component<TransformComponent>().position;
+
+                        glm::vec3 look_pos = pos + dir;
+                        light.shadow_info.view = glm::lookAt(pos, look_pos, glm::vec3(0.0, 1.0, 0.0));
+
+                        if(light.shadow_info.shadow_image.is_empty()) {
+                            light.shadow_info.depth_image = device.create_image({
+                                .format = daxa::Format::D16_UNORM,
+                                .aspect = daxa::ImageAspectFlagBits::DEPTH,
+                                .size = {static_cast<u32>(light.shadow_info.image_size.x), static_cast<u32>(light.shadow_info.image_size.y), 1},
+                                .usage = daxa::ImageUsageFlagBits::DEPTH_STENCIL_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                            });
+
+                            light.shadow_info.shadow_image = device.create_image({
+                                .format = daxa::Format::R16G16_UNORM,
+                                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                                .size = {static_cast<u32>(light.shadow_info.image_size.x), static_cast<u32>(light.shadow_info.image_size.y), 1},
+                                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                            });
+
+                            light.shadow_info.temp_shadow_image = device.create_image({
+                                .format = daxa::Format::R16G16_UNORM,
+                                .aspect = daxa::ImageAspectFlagBits::COLOR,
+                                .size = {static_cast<u32>(light.shadow_info.image_size.x), static_cast<u32>(light.shadow_info.image_size.y), 1},
+                                .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY,
+                            });
+                        }
 
                         temp_light.position = *reinterpret_cast<const f32vec3 *>(&tc.position);
                         temp_light.direction = *reinterpret_cast<const f32vec3 *>(&dir);
@@ -473,6 +618,12 @@ namespace Stellar {
                         temp_light.intensity = light.intensity;
                         temp_light.cut_off = glm::cos(glm::radians(light.cut_off));
                         temp_light.outer_cut_off = glm::cos(glm::radians(light.outer_cut_off));
+
+                        temp_light.shadow_image = TextureId { .texture_id = light.shadow_info.shadow_image.default_view(), .sampler_id = pcf_sampler };
+
+                        glm::mat4 light_matrix = light.shadow_info.projection * light.shadow_info.view;
+
+                        temp_light.light_matrix = *reinterpret_cast<const f32mat4x4*>(&light_matrix);
 
                         temp_light_buffer.num_spot_lights++;
                     }
@@ -500,6 +651,165 @@ namespace Stellar {
                 .size = sizeof(LightBuffer),
             });
 
+            /*std::cout << "here" << std::endl;
+
+            iterate([&](Entity light_entity){
+                if(light_entity.has_component<DirectionalLightComponent>()) {
+                    std::cout << "here 1" << std::endl;
+                    auto& light = light_entity.get_component<DirectionalLightComponent>();
+
+                    u32 size_x = static_cast<u32>(light.shadow_info.image_size.x);
+                    u32 size_y = static_cast<u32>(light.shadow_info.image_size.y);
+                    
+                    cmd_list.pipeline_barrier_image_transition({
+                        .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                        .before_layout = daxa::ImageLayout::UNDEFINED,
+                        .after_layout = daxa::ImageLayout::GENERAL,
+                        .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+                        .image_id = light.shadow_info.shadow_image,
+                    });
+
+                    cmd_list.begin_renderpass({
+                        .depth_attachment = {{
+                            .image_view = light.shadow_info.shadow_image.default_view(),
+                            .load_op = daxa::AttachmentLoadOp::CLEAR,
+                            .clear_value = daxa::DepthValue{1.0f, 0},
+                        }},
+                        .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                    });
+                    cmd_list.set_pipeline(*normal_shadow_pipeline);
+
+                    ShadowPush push;
+                    glm::mat4 vp = light.shadow_info.projection * light.shadow_info.view;
+                    push.light_matrix = *reinterpret_cast<const f32mat4x4*>(&vp);
+
+                    iterate([&](Entity entity){
+                        if(entity.has_component<ModelComponent>()) {
+                            auto& model = entity.get_component<ModelComponent>().model;
+                            auto& tc = entity.get_component<TransformComponent>();
+
+                            push.transform_buffer = device.get_device_address(tc.transform_buffer);
+
+                            model->draw(cmd_list, push);
+                        }
+                    });
+
+                    //cmd_list.end_renderpass();
+
+                }
+
+                if(light_entity.has_component<SpotLightComponent>()) {
+                    std::cout << "here 2" << std::endl;
+                    auto& light = light_entity.get_component<SpotLightComponent>();
+
+                    u32 size_x = static_cast<u32>(light.shadow_info.image_size.x);
+                    u32 size_y = static_cast<u32>(light.shadow_info.image_size.y);
+                    
+                    cmd_list.pipeline_barrier_image_transition({
+                        .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                        .before_layout = daxa::ImageLayout::UNDEFINED,
+                        .after_layout = daxa::ImageLayout::GENERAL,
+                        .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+                        .image_id = light.shadow_info.depth_image,
+                    });
+
+                    cmd_list.pipeline_barrier_image_transition({
+                        .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                        .before_layout = daxa::ImageLayout::UNDEFINED,
+                        .after_layout = daxa::ImageLayout::GENERAL,
+                        .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::COLOR },
+                        .image_id = light.shadow_info.shadow_image,
+                    });
+
+                    cmd_list.pipeline_barrier_image_transition({
+                        .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                        .before_layout = daxa::ImageLayout::UNDEFINED,
+                        .after_layout = daxa::ImageLayout::GENERAL,
+                        .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::COLOR },
+                        .image_id = light.shadow_info.temp_shadow_image,
+                    });
+
+                    cmd_list.begin_renderpass({
+                        .color_attachments = {
+                            {
+                                .image_view = light.shadow_info.shadow_image.default_view(),
+                                .load_op = daxa::AttachmentLoadOp::CLEAR,
+                                .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                            },
+                        },
+                        .depth_attachment = {{
+                            .image_view = light.shadow_info.depth_image.default_view(),
+                            .load_op = daxa::AttachmentLoadOp::CLEAR,
+                            .clear_value = daxa::DepthValue{1.0f, 0},
+                        }},
+                        .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                    });
+                    cmd_list.set_pipeline(*variance_shadow_pipeline);
+
+                    ShadowPush push;
+                    glm::mat4 vp = light.shadow_info.projection * light.shadow_info.view;
+                    push.light_matrix = *reinterpret_cast<const f32mat4x4*>(&vp);
+
+                    iterate([&](Entity entity){
+                        if(entity.has_component<ModelComponent>()) {
+                            auto& model = entity.get_component<ModelComponent>().model;
+                            auto& tc = entity.get_component<TransformComponent>();
+                            if(tc.transform_buffer.is_empty()) {
+                                return;
+                            }
+
+                            push.transform_buffer = device.get_device_address(tc.transform_buffer);
+
+                            model->draw(cmd_list, push);
+                        }
+                    });
+
+                    cmd_list.end_renderpass();
+
+                    cmd_list.begin_renderpass({
+                        .color_attachments = {
+                            {
+                                .image_view = light.shadow_info.temp_shadow_image.default_view(),
+                                .load_op = daxa::AttachmentLoadOp::CLEAR,
+                                .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                            },
+                        },
+                        .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                    });
+                    cmd_list.set_pipeline(*filter_gauss_pipeline);
+
+                    
+                    cmd_list.push_constant(GaussPush {
+                        .src_texture = light.shadow_info.shadow_image.default_view(),
+                        .blur_scale = { 1.0f / static_cast<f32>(size_x), 0.0f }
+                    });
+                    cmd_list.draw({ .vertex_count = 3});
+
+                    cmd_list.end_renderpass();
+
+                    cmd_list.begin_renderpass({
+                        .color_attachments = {
+                            {
+                                .image_view = light.shadow_info.shadow_image.default_view(),
+                                .load_op = daxa::AttachmentLoadOp::CLEAR,
+                                .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                            },
+                        },
+                        .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                    });
+                    cmd_list.set_pipeline(*filter_gauss_pipeline);
+
+                    
+                    cmd_list.push_constant(GaussPush {
+                        .src_texture = light.shadow_info.temp_shadow_image.default_view(),
+                        .blur_scale = { 0.0f, 1.0f / static_cast<f32>(size_y) }
+                    });
+                    cmd_list.draw({ .vertex_count = 3});
+
+                    cmd_list.end_renderpass();
+                }
+            });*/
+
             cmd_list.complete();
             device.submit_commands({
                 .command_lists = {std::move(cmd_list)},
@@ -508,6 +818,168 @@ namespace Stellar {
 
         iterate([&](Entity entity){
             entity.update(device);
+        });
+
+        auto cmd_list = device.create_command_list({
+            .debug_name = "",
+        });
+
+
+        iterate([&](Entity light_entity){
+            if(light_entity.has_component<DirectionalLightComponent>()) {
+                auto& light = light_entity.get_component<DirectionalLightComponent>();
+
+                u32 size_x = static_cast<u32>(light.shadow_info.image_size.x);
+                u32 size_y = static_cast<u32>(light.shadow_info.image_size.y);
+                
+                cmd_list.pipeline_barrier_image_transition({
+                    .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                    .before_layout = daxa::ImageLayout::UNDEFINED,
+                    .after_layout = daxa::ImageLayout::GENERAL,
+                    .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+                    .image_id = light.shadow_info.shadow_image,
+                });
+
+                cmd_list.begin_renderpass({
+                    .depth_attachment = {{
+                        .image_view = light.shadow_info.shadow_image.default_view(),
+                        .load_op = daxa::AttachmentLoadOp::CLEAR,
+                        .clear_value = daxa::DepthValue{1.0f, 0},
+                    }},
+                    .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                });
+                cmd_list.set_pipeline(*normal_shadow_pipeline);
+
+                ShadowPush push;
+                glm::mat4 vp = light.shadow_info.projection * light.shadow_info.view;
+                push.light_matrix = *reinterpret_cast<const f32mat4x4*>(&vp);
+
+                iterate([&](Entity entity){
+                    if(entity.has_component<ModelComponent>()) {
+                        auto& model = entity.get_component<ModelComponent>().model;
+                        auto& tc = entity.get_component<TransformComponent>();
+
+                        push.transform_buffer = device.get_device_address(tc.transform_buffer);
+
+                        model->draw(cmd_list, push);
+                    }
+                });
+
+                cmd_list.end_renderpass();
+
+            }
+
+            if(light_entity.has_component<SpotLightComponent>()) {
+                auto& light = light_entity.get_component<SpotLightComponent>();
+
+                u32 size_x = static_cast<u32>(light.shadow_info.image_size.x);
+                u32 size_y = static_cast<u32>(light.shadow_info.image_size.y);
+                
+                cmd_list.pipeline_barrier_image_transition({
+                    .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                    .before_layout = daxa::ImageLayout::UNDEFINED,
+                    .after_layout = daxa::ImageLayout::GENERAL,
+                    .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::DEPTH },
+                    .image_id = light.shadow_info.depth_image,
+                });
+
+                cmd_list.pipeline_barrier_image_transition({
+                    .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                    .before_layout = daxa::ImageLayout::UNDEFINED,
+                    .after_layout = daxa::ImageLayout::GENERAL,
+                    .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::COLOR },
+                    .image_id = light.shadow_info.shadow_image,
+                });
+
+                cmd_list.pipeline_barrier_image_transition({
+                    .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                    .before_layout = daxa::ImageLayout::UNDEFINED,
+                    .after_layout = daxa::ImageLayout::GENERAL,
+                    .image_slice = {.image_aspect = daxa::ImageAspectFlagBits::COLOR },
+                    .image_id = light.shadow_info.temp_shadow_image,
+                });
+
+                cmd_list.begin_renderpass({
+                    .color_attachments = {
+                        {
+                            .image_view = light.shadow_info.shadow_image.default_view(),
+                            .load_op = daxa::AttachmentLoadOp::CLEAR,
+                            .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                        },
+                    },
+                    .depth_attachment = {{
+                        .image_view = light.shadow_info.depth_image.default_view(),
+                        .load_op = daxa::AttachmentLoadOp::CLEAR,
+                        .clear_value = daxa::DepthValue{1.0f, 0},
+                    }},
+                    .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                });
+                cmd_list.set_pipeline(*variance_shadow_pipeline);
+
+                ShadowPush push;
+                glm::mat4 vp = light.shadow_info.projection * light.shadow_info.view;
+                push.light_matrix = *reinterpret_cast<const f32mat4x4*>(&vp);
+
+                iterate([&](Entity entity){
+                    if(entity.has_component<ModelComponent>()) {
+                        auto& model = entity.get_component<ModelComponent>().model;
+                        auto& tc = entity.get_component<TransformComponent>();
+
+                        push.transform_buffer = device.get_device_address(tc.transform_buffer);
+
+                        model->draw(cmd_list, push);
+                    }
+                });
+
+                cmd_list.end_renderpass();
+
+                cmd_list.begin_renderpass({
+                    .color_attachments = {
+                        {
+                            .image_view = light.shadow_info.temp_shadow_image.default_view(),
+                            .load_op = daxa::AttachmentLoadOp::CLEAR,
+                            .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                        },
+                    },
+                    .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                });
+                cmd_list.set_pipeline(*filter_gauss_pipeline);
+
+                
+                cmd_list.push_constant(GaussPush {
+                    .src_texture = light.shadow_info.shadow_image.default_view(),
+                    .blur_scale = { 1.0f / static_cast<f32>(size_x), 0.0f }
+                });
+                cmd_list.draw({ .vertex_count = 3});
+
+                cmd_list.end_renderpass();
+
+                cmd_list.begin_renderpass({
+                    .color_attachments = {
+                        {
+                            .image_view = light.shadow_info.shadow_image.default_view(),
+                            .load_op = daxa::AttachmentLoadOp::CLEAR,
+                            .clear_value = std::array<f32, 4>{1.0f, 1.0f, 1.0f, 1.0f},
+                        },
+                    },
+                    .render_area = {.x = 0, .y = 0, .width = size_x, .height = size_y},
+                });
+                cmd_list.set_pipeline(*filter_gauss_pipeline);
+
+                
+                cmd_list.push_constant(GaussPush {
+                    .src_texture = light.shadow_info.temp_shadow_image.default_view(),
+                    .blur_scale = { 0.0f, 1.0f / static_cast<f32>(size_y) }
+                });
+                cmd_list.draw({ .vertex_count = 3});
+
+                cmd_list.end_renderpass();
+            }
+        });
+
+        cmd_list.complete();
+        device.submit_commands({
+            .command_lists = {std::move(cmd_list)},
         });
     }
 }

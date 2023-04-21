@@ -5,6 +5,7 @@
 #include <daxa/types.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 #include <glm/trigonometric.hpp>
 #include <thread>
 
@@ -18,6 +19,8 @@
 #include "../shaders/shared.inl"
 
 namespace Stellar {
+    static constexpr f32 sun_factor = 64.0f;
+
     Editor::Editor(Context&& _context, std::shared_ptr<Stellar::Window>&& _window, daxa::Swapchain&& _swapchain, const std::string_view& project_path) : context{_context}, window{_window}, swapchain{_swapchain} {
         window->toggle_border(true);
         window->set_size(1200, 720);
@@ -31,7 +34,7 @@ namespace Stellar {
         swapchain.resize();
         swapchain.resize();
         
-        scene = std::make_shared<Scene>("Test", context.device);
+        scene = std::make_shared<Scene>("Test", context.device, context.pipeline_manager);
         scene->deserialize("test.scene");
 
         scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene);
@@ -73,7 +76,7 @@ namespace Stellar {
         CORE_INFO("Test");
 
         albedo_image = context.device.create_image({
-            .format = daxa::Format::R8G8B8A8_UNORM,
+            .format = daxa::Format::R8G8B8A8_SRGB,
             .aspect = daxa::ImageAspectFlagBits::COLOR,
             .size = { size_x, size_y, 1 },
             .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
@@ -91,7 +94,7 @@ namespace Stellar {
         });
 
         render_image = context.device.create_image({
-            .format = daxa::Format::R8G8B8A8_UNORM,
+            .format = daxa::Format::R8G8B8A8_SRGB,
             .aspect = daxa::ImageAspectFlagBits::COLOR,
             .size = { size_x, size_y, 1 },
             .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
@@ -143,7 +146,7 @@ namespace Stellar {
             .vertex_shader_info = {.source = daxa::ShaderFile{"deffered.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
             .fragment_shader_info = {.source = daxa::ShaderFile{"deffered.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
             .color_attachments = {
-                { .format = daxa::Format::R8G8B8A8_UNORM },
+                { .format = daxa::Format::R8G8B8A8_SRGB },
                 { .format = daxa::Format::R16G16B16A16_SFLOAT }
             },
             .depth_test = {
@@ -162,7 +165,7 @@ namespace Stellar {
             .vertex_shader_info = {.source = daxa::ShaderFile{"composition.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
             .fragment_shader_info = {.source = daxa::ShaderFile{"composition.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
             .color_attachments = {
-                { .format = daxa::Format::R8G8B8A8_UNORM },
+                { .format = daxa::Format::R8G8B8A8_SRGB },
             },
             .raster = {
                 .face_culling = daxa::FaceCullFlagBits::NONE
@@ -174,7 +177,7 @@ namespace Stellar {
         billboard_pipeline = context.pipeline_manager.add_raster_pipeline({
             .vertex_shader_info = {.source = daxa::ShaderFile{"billboard.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
             .fragment_shader_info = {.source = daxa::ShaderFile{"billboard.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
-            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_UNORM }},
+            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_SRGB }},
             .depth_test = {
                 .depth_attachment_format = daxa::Format::D32_SFLOAT,
                 .enable_depth_test = true,
@@ -185,6 +188,22 @@ namespace Stellar {
             },
             .push_constant_size = sizeof(BillboardPush),
             .debug_name = "billboard_pipeline",
+        }).value();
+
+        atmosphere_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"atmosphere.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"atmosphere.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_SRGB }},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .face_culling = daxa::FaceCullFlagBits::NONE
+            },
+            .push_constant_size = sizeof(SkyPush),
+            .debug_name = "atmosphere_pipeline",
         }).value();
 
         this->ssao_generation_pipeline = context.pipeline_manager.add_raster_pipeline({
@@ -237,6 +256,136 @@ namespace Stellar {
             .max_lod = static_cast<f32>(1),
             .enable_unnormalized_coordinates = false,
         });
+
+        std::vector<f32> vertices = {
+            -0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f, -0.5f,
+            0.5f,  0.5f, -0.5f,
+            0.5f,  0.5f, -0.5f,
+            -0.5f,  0.5f, -0.5f,
+            -0.5f, -0.5f, -0.5f,
+
+            -0.5f, -0.5f,  0.5f,
+            0.5f, -0.5f,  0.5f,
+            0.5f,  0.5f,  0.5f,
+            0.5f,  0.5f,  0.5f,
+            -0.5f,  0.5f,  0.5f,
+            -0.5f, -0.5f,  0.5f,
+
+            -0.5f,  0.5f,  0.5f,
+            -0.5f,  0.5f, -0.5f,
+            -0.5f, -0.5f, -0.5f,
+            -0.5f, -0.5f, -0.5f,
+            -0.5f, -0.5f,  0.5f,
+            -0.5f,  0.5f,  0.5f,
+
+            0.5f,  0.5f,  0.5f,
+            0.5f,  0.5f, -0.5f,
+            0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f,  0.5f,
+            0.5f,  0.5f,  0.5f,
+
+            -0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f, -0.5f,
+            0.5f, -0.5f,  0.5f,
+            0.5f, -0.5f,  0.5f,
+            -0.5f, -0.5f,  0.5f,
+            -0.5f, -0.5f, -0.5f,
+
+            -0.5f,  0.5f, -0.5f,
+            0.5f,  0.5f, -0.5f,
+            0.5f,  0.5f,  0.5f,
+            0.5f,  0.5f,  0.5f,
+            -0.5f,  0.5f,  0.5f,
+            -0.5f,  0.5f, -0.5f,
+        };
+
+        daxa::BufferId temp_face_buffer = context.device.create_buffer({
+            .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+            .size = static_cast<u32>(sizeof(f32) * vertices.size()),
+        });
+
+        face_buffer = context.device.create_buffer({
+            .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+            .size = static_cast<u32>(sizeof(f32) * vertices.size()),
+        });
+
+        std::memcpy(context.device.get_host_address_as<f32>(temp_face_buffer), vertices.data(), sizeof(f32) * vertices.size());
+
+        auto cmd_list = context.device.create_command_list({
+            .debug_name = "",
+        });
+
+        cmd_list.destroy_buffer_deferred(temp_face_buffer);
+
+        cmd_list.copy_buffer_to_buffer({
+            .src_buffer = temp_face_buffer,
+            .dst_buffer = face_buffer,
+            .size = static_cast<u32>(sizeof(f32) * vertices.size()),
+        });
+
+        cmd_list.complete();
+        context.device.submit_commands({
+            .command_lists = {std::move(cmd_list)},
+        });
+
+        /*{
+            Entity eaa = scene->create_entity("bruh");
+            auto m = std::make_shared<Model>(context.device, "models/glTF/BarramundiFish.gltf");
+            for(auto& p : m->primitives) {
+                std::cout << p.index_count << std::endl;
+            }
+            auto& mc = eaa.add_component<ModelComponent>();
+            mc.model = m;
+            eaa.add_component<TransformComponent>();
+        }*/
+
+        /*std::cout << "----" << std::endl;
+
+        {
+            Entity eaa = scene->create_entity("bruh 2");
+            auto m = std::make_shared<Model>(context.device, "models/FlightHelmet/glTF/FlightHelmet.gltf");
+            
+            for(auto& p : m->primitives) {
+                std::cout << p.index_count << std::endl;
+            }
+            auto& mc = eaa.add_component<ModelComponent>();
+            mc.model = m;
+            auto& tc = eaa.add_component<TransformComponent>();
+            tc.position.x = 2.0f;
+        }
+
+        std::cout << "----" << std::endl;
+
+        {
+            Entity eaa = scene->create_entity("bruh 2");
+            auto m = std::make_shared<Model>(context.device, "models/FlightHelmet/glTF/FlightHelmet.gltf");
+            
+            for(auto& p : m->primitives) {
+                std::cout << p.index_count << std::endl;
+            }
+            auto& mc = eaa.add_component<ModelComponent>();
+            mc.model = m;
+            auto& tc = eaa.add_component<TransformComponent>();
+            tc.position.x = 2.0f;
+        }
+
+        std::cout << "----" << std::endl;
+
+        {
+            Entity eaa = scene->create_entity("bruh 3");
+            auto m = std::make_shared<Model>(context.device, "models/ABeautifulGame/glTF/ABeautifulGame.gltf");
+            
+            for(auto& p : m->primitives) {
+                std::cout << p.index_count << std::endl;
+            }
+            auto& mc = eaa.add_component<ModelComponent>();
+            mc.model = m;
+            auto& tc = eaa.add_component<TransformComponent>();
+            tc.position.x = 4.0f;
+        }*/
+
     }
 
     Editor::~Editor() {
@@ -252,6 +401,7 @@ namespace Stellar {
         context.device.destroy_image(ssao_image);
         context.device.destroy_image(ssao_blur_image);
         context.device.destroy_buffer(editor_camera_buffer);
+        context.device.destroy_buffer(face_buffer);
     }
 
     void Editor::run() {
@@ -306,11 +456,11 @@ namespace Stellar {
         bool open = true;
         logger_panel->draw("Logger Panel", &open);
 
-        viewport_panel->draw(render_image, window, scene_hiearchy_panel, editor_camera);
+        viewport_panel->draw(displayed_image.is_empty() ? render_image : displayed_image, window, scene_hiearchy_panel, editor_camera);
         if(viewport_panel->should_resize) {
             context.device.destroy_image(albedo_image);
             albedo_image = context.device.create_image({
-                .format = daxa::Format::R8G8B8A8_UNORM,
+                .format = daxa::Format::R8G8B8A8_SRGB,
                 .aspect = daxa::ImageAspectFlagBits::COLOR,
                 .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
                 .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
@@ -330,7 +480,7 @@ namespace Stellar {
 
             context.device.destroy_image(render_image);
             render_image = context.device.create_image({
-                .format = daxa::Format::R8G8B8A8_UNORM,
+                .format = daxa::Format::R8G8B8A8_SRGB,
                 .aspect = daxa::ImageAspectFlagBits::COLOR,
                 .size = { viewport_panel->viewport_size_x, viewport_panel->viewport_size_y, 1 },
                 .usage = daxa::ImageUsageFlagBits::COLOR_ATTACHMENT | daxa::ImageUsageFlagBits::SHADER_READ_ONLY | daxa::ImageUsageFlagBits::TRANSFER_DST,
@@ -367,7 +517,15 @@ namespace Stellar {
             });
 
             viewport_panel->should_resize = false;
+            displayed_image = render_image;
         }
+
+        ImGui::Begin("G-Buffer Attachments");
+        if(ImGui::Checkbox("Render image", &show_render)) { displayed_image = render_image; }
+        if(ImGui::Checkbox("Albedo image", &show_albedo)) { displayed_image = albedo_image; }
+        if(ImGui::Checkbox("Normal image", &show_normal)) { displayed_image = normal_image; }
+        if(ImGui::Checkbox("SSAO image", &show_ssao)) { displayed_image = ssao_blur_image; }
+        ImGui::End();
 
         ImGui::Render();
     }
@@ -547,6 +705,9 @@ namespace Stellar {
         cmd_list.draw({ .vertex_count = 3 });
         cmd_list.end_renderpass();
 
+        glm::vec3 dir = { 0.0f, -1.0f, 0.0f };
+        dir = glm::rotateZ(dir, upTime / sun_factor);
+
         cmd_list.begin_renderpass({
             .color_attachments = {
                 {
@@ -566,6 +727,7 @@ namespace Stellar {
             .ssao = { .texture_id = ssao_blur_image.default_view(), .sampler_id = sampler },
             .light_buffer = context.device.get_device_address(scene->light_buffer),
             .camera_info = context.device.get_device_address(editor_camera_buffer),
+            .ambient = glm::dot(dir, {0.0f, -1.0f, 0.0f})
         });
 
         cmd_list.draw({ .vertex_count = 3 });
@@ -625,6 +787,19 @@ namespace Stellar {
 
             cmd_list.draw({ .vertex_count = 6 });
         });
+
+        glm::mat4 model_matrix = glm::translate(glm::mat4{1.0f}, glm::vec3{ 0.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4{1.0f}, glm::vec3{ 1000.0f, 1000.0f, 1000.0f });
+
+        glm::vec3 sun_position = glm::vec3{ 0.0f, 6372e3f, 0.0f };
+        sun_position = glm::rotateZ(sun_position, upTime / sun_factor);
+        cmd_list.set_pipeline(*atmosphere_pipeline);
+        cmd_list.push_constant(SkyPush {
+            .vertex_buffer = context.device.get_device_address(face_buffer),
+            .model_matrix = *reinterpret_cast<f32mat4x4*>(&model_matrix),
+            .sun_position = *reinterpret_cast<f32vec3*>(&sun_position),
+            .camera_info = context.device.get_device_address(editor_camera_buffer)
+        });
+        cmd_list.draw({ .vertex_count = 36 });
 
         cmd_list.end_renderpass();
 

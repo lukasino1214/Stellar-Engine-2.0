@@ -74,9 +74,6 @@ namespace Stellar {
     void DirectionalLightComponent::draw() {
         GUI::begin_properties();
 
-        static std::array<f32, 3> reset_values = { 0.0f, 0.0f, 0.0f };
-        static std::array<const char*, 3> tooltips = { "Some tooltip.", "Some tooltip.", "Some tooltip." };
-
         if (GUI::f32_property("Intensity:", intensity, nullptr)) { is_dirty = true;}
         if (ImGui::ColorPicker3("Color:", &color[0])) { is_dirty = true; }
 
@@ -86,10 +83,7 @@ namespace Stellar {
     void PointLightComponent::draw() {
         GUI::begin_properties();
 
-        static std::array<f32, 3> reset_values = { 0.0f, 0.0f, 0.0f };
-        static std::array<const char*, 3> tooltips = { "Some tooltip.", "Some tooltip.", "Some tooltip." };
-
-        if (GUI::f32_property("Intensity:", intensity, tooltips[0])) { is_dirty = true;}
+        if (GUI::f32_property("Intensity:", intensity, nullptr)) { is_dirty = true;}
         if (ImGui::ColorPicker3("Color:", &color[0])) { is_dirty = true; }
 
         GUI::end_properties();

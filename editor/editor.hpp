@@ -53,6 +53,13 @@ namespace Stellar {
         daxa::ImageId ssao_image;
         daxa::ImageId ssao_blur_image;
 
+        daxa::ImageId displayed_image;
+
+        bool show_render = false;
+        bool show_albedo = false;
+        bool show_normal = false;
+        bool show_ssao = false;
+
         daxa::SamplerId sampler;
 
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
@@ -61,7 +68,7 @@ namespace Stellar {
         std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
         std::shared_ptr<daxa::RasterPipeline> ssao_generation_pipeline;
         std::shared_ptr<daxa::RasterPipeline> ssao_blur_pipeline;
-
+        std::shared_ptr<daxa::RasterPipeline> atmosphere_pipeline;
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;
         std::unique_ptr<AssetBrowserPanel> asset_browser_panel;
@@ -82,5 +89,7 @@ namespace Stellar {
         ControlledCamera3D editor_camera;
         daxa::BufferId editor_camera_buffer;
         std::shared_ptr<Scene> scene;
+
+        daxa::BufferId face_buffer;
     };
 }

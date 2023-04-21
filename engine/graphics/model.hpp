@@ -22,6 +22,7 @@ namespace Stellar {
 
         void draw(daxa::CommandList& cmd_list, DepthPrepassPush& draw_push);
         void draw(daxa::CommandList& cmd_list, DrawPush& draw_push);
+        void draw(daxa::CommandList& cmd_list, ShadowPush& draw_push);
 
         daxa::Device device;
         daxa::BufferId face_buffer = {};

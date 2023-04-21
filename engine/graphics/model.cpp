@@ -54,14 +54,14 @@ namespace Stellar {
         };
 
         std::vector<TextureHelper> texture_helpers = {};
-        auto vec_set = [&](const std::string& path, daxa::Format format){
+        auto vec_set = [&](const std::string& path, daxa::Format _format){
             for(auto& tex : texture_helpers) {
                 if(tex.path == path) { return; }
             }
 
             texture_helpers.push_back({
                 .path = path,
-                .format = format
+                .format = _format
             });
         };
 
@@ -116,7 +116,7 @@ namespace Stellar {
 
             if (aiString lightmapTex{}; aiGetMaterialTexture(material, aiTextureType_LIGHTMAP, 0, &lightmapTex) == AI_SUCCESS) {
                 std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + lightmapTex.C_Str();
-                throw std::runtime_error("unhandled aiTextureType_LIGHTMAP: " + texture);
+                //throw std::runtime_error("unhandled aiTextureType_LIGHTMAP: " + texture);
 			}
 
             if (aiString reflectionTex{}; aiGetMaterialTexture(material, aiTextureType_REFLECTION, 0, &reflectionTex) == AI_SUCCESS) {
@@ -281,7 +281,7 @@ namespace Stellar {
             if (aiString lightmapTex{}; aiGetMaterialTexture(material, aiTextureType_LIGHTMAP, 0, &lightmapTex) == AI_SUCCESS) {
                 std::string texture = std::filesystem::path{file_path}.parent_path().string() + "/" + lightmapTex.C_Str();
                 //std::cout << "aiTextureType_LIGHTMAP: " << texture << std::endl;
-                throw std::runtime_error("unhandled aiTextureType_LIGHTMAP: " + texture);
+                //throw std::runtime_error("unhandled aiTextureType_LIGHTMAP: " + texture);
 			}
 
             if (aiString reflectionTex{}; aiGetMaterialTexture(material, aiTextureType_REFLECTION, 0, &reflectionTex) == AI_SUCCESS) {
@@ -615,6 +615,31 @@ namespace Stellar {
         draw_push.vertex_buffer = device.get_device_address(face_buffer);
         for (auto & primitive : primitives) {
             draw_push.material_index = primitive.material_index;
+            cmd_list.push_constant(draw_push);
+
+            if (primitive.index_count > 0) {
+                cmd_list.set_index_buffer(index_buffer, 0, 4);
+                cmd_list.draw_indexed({
+                    .index_count = primitive.index_count,
+                    .instance_count = 1,
+                    .first_index = primitive.first_index,
+                    .vertex_offset = static_cast<i32>(primitive.first_vertex),
+                    .first_instance = 0,
+                });
+            } else {
+                cmd_list.draw({
+                    .vertex_count = primitive.vertex_count,
+                    .instance_count = 1,
+                    .first_vertex = primitive.first_vertex,
+                    .first_instance = 0
+                });
+            }
+        }
+    }
+
+    void Model::draw(daxa::CommandList& cmd_list, ShadowPush& draw_push) {
+        draw_push.vertex_buffer = device.get_device_address(face_buffer);
+        for (auto & primitive : primitives) {
             cmd_list.push_constant(draw_push);
 
             if (primitive.index_count > 0) {

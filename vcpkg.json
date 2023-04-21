@@ -33,7 +33,8 @@
     "spdlog",
     "fmt",
     "assimp",
-    "imguizmo"
+    "imguizmo",
+    "physx"
   ],
   "vcpkg-configuration": {
     "overlay-ports": [

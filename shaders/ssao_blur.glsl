@@ -40,7 +40,7 @@ void main() {
 			n++;
 		}
 	}
-	out_ssao = pow(result / (f32(n)), 4);
+	out_ssao = pow(result / (f32(n)), 2);
 }
 
 #endif
