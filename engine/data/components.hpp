@@ -5,6 +5,7 @@
 #include <entt/entt.hpp>
 #include <graphics/camera.hpp>
 #include <graphics/model.hpp>
+#include <physics/physics.hpp>
 
 namespace Stellar {
     struct UUIDComponent {
@@ -26,6 +27,8 @@ namespace Stellar {
         void draw();
     };
 
+    struct Entity;
+
     struct TransformComponent {
         glm::vec3 position = { 0.0f, 0.0f, 0.0f };
         glm::vec3 rotation{ 0.0001f, 0.0001f, 0.0001f };
@@ -36,7 +39,7 @@ namespace Stellar {
 
         daxa::BufferId transform_buffer;
 
-        void draw();
+        void draw(Entity& entity);
     };
 
     struct CameraComponent {
@@ -90,5 +93,25 @@ namespace Stellar {
         ShadowInfo shadow_info;
 
         void draw();
+    };
+
+    struct RigidBodyComponent {
+        physx::PxMaterial* material = nullptr;
+        physx::PxShape* shape = nullptr;
+        physx::PxActor* body = nullptr;
+
+        RigidBodyType rigid_body_type = RigidBodyType::Static;
+        GeometryType geometry_type = GeometryType::Box;
+
+        f32 radius = 0.5f;
+        f32 half_height = 0.5f;
+        glm::vec3 half_extent = { 0.5f, 0.5f, 0.5f };
+
+        f32 density = 10.0f;
+        f32 static_friction = 0.5f;
+        f32 dynamic_friction = 0.5f;
+        f32 restitution = 0.5f;
+
+        void draw(const std::shared_ptr<Physics>& physics, Entity& entity);
     };
 }

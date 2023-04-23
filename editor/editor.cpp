@@ -34,10 +34,12 @@ namespace Stellar {
         swapchain.resize();
         swapchain.resize();
         
-        scene = std::make_shared<Scene>("Test", context.device, context.pipeline_manager);
+        physics = std::make_shared<Physics>();
+        scene = std::make_shared<Scene>("Test", context.device, context.pipeline_manager, physics);
         scene->deserialize("test.scene");
 
-        scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene);
+
+        scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene, physics);
         asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
         toolbar_panel = std::make_unique<ToolbarPanel>(window);
         performance_stats_panel = std::make_unique<PerformanceStatsPanel>();
@@ -386,6 +388,39 @@ namespace Stellar {
             tc.position.x = 4.0f;
         }*/
 
+        physx::PxMaterial* material = physics->gPhysics->createMaterial(0.5f, 0.5f, 0.6f);
+
+        physx::PxShape* shape = physics->gPhysics->createShape(physx::PxBoxGeometry(0.5f, 0.5f, 0.5f), *material);
+        
+        body = physics->gPhysics->createRigidDynamic(physx::PxTransform(physx::PxVec3(0.0f, 50.0f, 0.0f)));
+
+        body->attachShape(*shape);
+        physx::PxRigidBodyExt::updateMassAndInertia(*body, 20.0f);
+
+        physics->gScene->addActor(*body);
+
+        //physx::PxRigidStatic* groundPlane = physx::PxCreatePlane(*physics->gPhysics, physx::PxPlane(physx::PxVec3(0.0f, 0.0f, 0.0f), physx::PxVec3(0.0f, 1.0f, 0.0f)), *material);
+        //physics->gScene->addActor(*groundPlane);
+
+        //physx::PxCreateStatic()
+        physx::PxRigidStatic* cube_floor = physics->gPhysics->createRigidStatic(physx::PxTransform(physx::PxVec3(0.0f, 0.0f, 0.0f)));
+        physx::PxShape* floor_shape = physics->gPhysics->createShape(physx::PxBoxGeometry(5.5f, 0.5f, 5.5f), *material);
+        cube_floor->attachShape(*floor_shape);
+        physics->gScene->addActor(*cube_floor);
+
+        /*for(u32 i = 0; i < 10000; i++) {
+            physics->step(1.0f/60.0f);
+            auto t = body->getGlobalPose();
+            std::cout << t.p.x << " " << t.p.y << " " << t.p.z << std::endl;
+        }*/
+
+
+        test_cube = scene->create_entity("test_cube");
+        test_cube.add_component<TransformComponent>();
+        auto m = std::make_shared<Model>(context.device, "models/cube.gltf");
+        auto& mc = test_cube.add_component<ModelComponent>();
+        mc.model = m;
+
     }
 
     Editor::~Editor() {
@@ -408,20 +443,25 @@ namespace Stellar {
         while(!window->should_close()) {
             glfwPollEvents();
 
+            f64 currentFrameTime = glfwGetTime();
+
+            deltaTime = static_cast<f32>(currentFrameTime - lastFrameTime);
+            lastFrameTime = currentFrameTime;
+
+            upTime = static_cast<f32>(currentFrameTime);
+            FPS = static_cast<u32>(glm::ceil(1.0f / deltaTime));
+
             ui_update();
+
+            if(toolbar_panel->play && deltaTime > 0.0f) {
+                physics->step(deltaTime);
+            }
+
             render();
         }
     }
 
     void Editor::ui_update() {
-        f64 currentFrameTime = glfwGetTime();
-
-        deltaTime = static_cast<f32>(currentFrameTime - lastFrameTime);
-        lastFrameTime = currentFrameTime;
-
-        upTime = static_cast<f32>(currentFrameTime);
-        FPS = static_cast<u32>(glm::ceil(1.0f / deltaTime));
-
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
@@ -531,7 +571,20 @@ namespace Stellar {
     }
 
     void Editor::render() {
+
+        if(toolbar_panel->play && deltaTime > 0.0) {
+            auto& _tc = test_cube.get_component<TransformComponent>();
+            auto t = body->getGlobalPose();
+            _tc.position = { t.p.x, t.p.y, t.p.z };
+            glm::vec3 rotation_radians = glm::eulerAngles(glm::quat{ t.q.w, t.q.x, t.q.y, t.q.z });
+            _tc.rotation = glm::degrees(rotation_radians);
+            _tc.is_dirty = true;
+
+            //physics->step(deltaTime);
+        }
+
         scene->update();
+
 
         daxa::ImageId swapchain_image = swapchain.acquire_next_image();
         if(swapchain_image.is_empty()) { return; }

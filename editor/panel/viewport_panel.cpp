@@ -70,6 +70,22 @@ namespace Stellar {
                 tc.rotation += rotation - tc.rotation;
                 tc.scale += scale - tc.scale;
                 tc.is_dirty = true;
+
+                if(selected_entity.has_component<RigidBodyComponent>()) {
+                    auto& pc = selected_entity.get_component<RigidBodyComponent>();
+                    if(pc.body != nullptr) {
+                        glm::quat a = glm::quat(glm::radians(tc.rotation));
+                        physx::PxTransform transform;
+                        transform.p = physx::PxVec3(tc.position.x, tc.position.y, tc.position.z),
+                        transform.q = physx::PxQuat(a.x, a.y, a.z, a.w);
+
+                        if(pc.rigid_body_type == RigidBodyType::Dynamic) {
+                            pc.body->is<physx::PxRigidDynamic>()->setGlobalPose(transform);
+                        } else {
+                            pc.body->is<physx::PxRigidStatic>()->setGlobalPose(transform);
+                        }
+                    }
+                }
             }
         }
 

@@ -1,5 +1,3 @@
-#define NDEBUG true
-
 #include <chrono>
 #include <iostream>
 

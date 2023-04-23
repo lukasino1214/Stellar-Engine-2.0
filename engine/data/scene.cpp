@@ -81,7 +81,7 @@ YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec4 &v) {
 }
 
 namespace Stellar {
-    Scene::Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager) : name{_name}, device{_device} {
+    Scene::Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager, const std::shared_ptr<Physics>& _physics) : name{_name}, device{_device}, physics{_physics} {
         registry = std::make_unique<entt::registry>();
 
         light_buffer = device.create_buffer({
@@ -221,6 +221,14 @@ namespace Stellar {
 
         if(entity.has_component<TransformComponent>()) {
             device.destroy_buffer(entity.get_component<TransformComponent>().transform_buffer);
+        }
+
+        if(entity.has_component<RigidBodyComponent>()) {
+            auto& pc = entity.get_component<RigidBodyComponent>();
+
+            physics->gScene->removeActor(*pc.body);
+            pc.shape->release();
+            pc.material->release();
         }
 
         registry->destroy(entity.handle);
@@ -857,6 +865,7 @@ namespace Stellar {
                 iterate([&](Entity entity){
                     if(entity.has_component<ModelComponent>()) {
                         auto& model = entity.get_component<ModelComponent>().model;
+                        if(!model) { return; }
                         auto& tc = entity.get_component<TransformComponent>();
 
                         push.transform_buffer = device.get_device_address(tc.transform_buffer);
@@ -923,6 +932,7 @@ namespace Stellar {
                 iterate([&](Entity entity){
                     if(entity.has_component<ModelComponent>()) {
                         auto& model = entity.get_component<ModelComponent>().model;
+                        if(!model) { return; }
                         auto& tc = entity.get_component<TransformComponent>();
 
                         push.transform_buffer = device.get_device_address(tc.transform_buffer);

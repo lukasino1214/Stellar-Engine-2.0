@@ -16,6 +16,8 @@
 #include <core/window.hpp>
 #include <graphics/model.hpp>
 
+#include <physics/physics.hpp>
+
 namespace Stellar {
     struct Context {
         daxa::Context context;
@@ -61,6 +63,10 @@ namespace Stellar {
         bool show_ssao = false;
 
         daxa::SamplerId sampler;
+
+        std::shared_ptr<Physics> physics;
+        Entity test_cube;
+        physx::PxRigidDynamic* body;
 
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
         std::shared_ptr<daxa::RasterPipeline> deffered_pipeline;

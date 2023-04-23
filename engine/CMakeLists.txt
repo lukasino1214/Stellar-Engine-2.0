@@ -17,6 +17,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     "graphics/texture.cpp"
     "graphics/camera.cpp"
     "graphics/model.cpp"
+    "physics/physics.cpp"
     "utils/utils.hpp"
     "utils/utils.cpp"
     "utils/gui.hpp"

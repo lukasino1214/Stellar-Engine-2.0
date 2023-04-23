@@ -40,8 +40,12 @@ namespace Stellar {
             }
 
             if (open) {
-                if constexpr(std::is_same<T, ModelComponent>::value) {
+                if constexpr(std::is_same_v<T, ModelComponent>) {
                     component.draw(scene->device);
+                } else if constexpr(std::is_same_v<T, RigidBodyComponent>) {
+                    component.draw(physics, entity);
+                } else if constexpr(std::is_same_v<T, TransformComponent>) {
+                    component.draw(entity);
                 } else {
                     component.draw();
                 }
@@ -69,12 +73,14 @@ namespace Stellar {
                     entity.try_add_component<TransformComponent>();
                 } else if constexpr(std::is_same_v<T, SpotLightComponent>) {
                     entity.try_add_component<TransformComponent>();
+                } else if constexpr(std::is_same_v<T, RigidBodyComponent>) {
+                    entity.try_add_component<TransformComponent>();
                 }
             }
         }
     }
 
-    SceneHiearchyPanel::SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene) : scene{_scene} {}
+    SceneHiearchyPanel::SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene, const std::shared_ptr<Physics>& _physics) : scene{_scene}, physics{_physics} {}
 
     void SceneHiearchyPanel::tree(Entity& entity, const RelationshipComponent &relationship_component, const u32 iteration) {
         ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_SpanAvailWidth;
@@ -204,10 +210,15 @@ namespace Stellar {
                 draw_component<SpotLightComponent>(selected_entity, "Spot Light Component");
             }
 
+            if(selected_entity.has_component<RigidBodyComponent>()) {
+                draw_component<RigidBodyComponent>(selected_entity, "RigidBody Component");
+            }
+
             if (ImGui::BeginPopupContextWindow(0, ImGuiPopupFlags_NoOpenOverItems | ImGuiPopupFlags_MouseButtonRight)) {
                 add_new_component<TransformComponent>(selected_entity, "Add Transform Component");
                 add_new_component<ModelComponent>(selected_entity, "Add Model Component");
                 add_new_component<CameraComponent>(selected_entity, "Add Camera Component");
+                add_new_component<RigidBodyComponent>(selected_entity, "Add RigidBody Component");
 
                 if(!(selected_entity.has_component<DirectionalLightComponent>() || selected_entity.has_component<PointLightComponent>() || selected_entity.has_component<SpotLightComponent>())) {
                     add_new_component<DirectionalLightComponent>(selected_entity, "Add Directional Light Component");

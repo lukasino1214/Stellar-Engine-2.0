@@ -4,6 +4,7 @@
 
 #include <data/components.hpp>
 #include <core/types.hpp>
+#include <physics/physics.hpp>
 
 #include <functional>
 
@@ -13,7 +14,7 @@ namespace Stellar {
     struct Entity;
 
     struct Scene {
-        explicit Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager);
+        explicit Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager, const std::shared_ptr<Physics>& _physics);
         ~Scene();
 
         auto create_entity(const std::string_view& _name) -> Entity;
@@ -33,6 +34,7 @@ namespace Stellar {
         std::string name;
         std::unique_ptr<entt::registry> registry;
         daxa::Device device;
+        std::shared_ptr<Physics> physics;
 
         daxa::BufferId light_buffer;
 

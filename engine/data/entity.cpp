@@ -31,6 +31,23 @@ namespace Stellar {
 
         if(has_component<TransformComponent>()) {
             auto& tc = get_component<TransformComponent>();
+
+            if(has_component<RigidBodyComponent>()) {
+                auto& pc = get_component<RigidBodyComponent>();
+                if(pc.body != nullptr) {
+                    physx::PxTransform t;
+                    if(pc.rigid_body_type == RigidBodyType::Dynamic) {
+                        t = pc.body->is<physx::PxRigidDynamic>()->getGlobalPose();
+                    } else {
+                        t = pc.body->is<physx::PxRigidStatic>()->getGlobalPose();
+                    }
+                    tc.position = { t.p.x, t.p.y, t.p.z };
+                    glm::vec3 rotation_radians = glm::eulerAngles(glm::quat{ t.q.w, t.q.x, t.q.y, t.q.z });
+                    tc.rotation = glm::degrees(rotation_radians);
+                    tc.is_dirty = true;
+                }
+            }
+
             if(tc.is_dirty) {
                 tc.model_matrix = glm::translate(glm::mat4(1.0f), tc.position) 
                     * glm::toMat4(glm::quat({glm::radians(tc.rotation.x), glm::radians(tc.rotation.y), glm::radians(tc.rotation.z)})) 
