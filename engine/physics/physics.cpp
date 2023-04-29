@@ -1,5 +1,8 @@
 #include "physics.hpp"
 
+#define NDEBUG true
+#include <PxPhysicsAPI.h>
+
 namespace Stellar {
     Physics::Physics() {
         gFoundation = PxCreateFoundation(PX_PHYSICS_VERSION, gAllocator, gErrorCallback);

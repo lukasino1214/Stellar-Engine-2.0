@@ -12,6 +12,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <graphics/model.hpp>
+
 namespace YAML {
     template<>
     struct convert<glm::vec3> {
@@ -144,7 +146,7 @@ namespace Stellar {
         todo();
     }
 
-    void TransformComponent::draw(Entity& entity) {
+    void TransformComponent::draw() {
         GUI::begin_properties(ImGuiTableFlags_BordersInnerV);
 
         static std::array<f32, 3> reset_values = { 0.0f, 0.0f, 0.0f };
@@ -156,22 +158,6 @@ namespace Stellar {
         reset_values = { 1.0f, 1.0f, 1.0f };
 
         if (GUI::vec3_property("Scale:", scale, reset_values.data(), tooltips.data())) { is_dirty = true; }
-
-        if(entity.has_component<RigidBodyComponent>() && is_dirty) {
-            auto& pc = entity.get_component<RigidBodyComponent>();
-            if(pc.body != nullptr) {
-                glm::quat a = glm::quat(glm::radians(rotation));
-                physx::PxTransform transform;
-                transform.p = physx::PxVec3(position.x, position.y, position.z),
-                transform.q = physx::PxQuat(a.x, a.y, a.z, a.w);
-
-                if(pc.rigid_body_type == RigidBodyType::Dynamic) {
-                    pc.body->is<physx::PxRigidDynamic>()->setGlobalPose(transform);
-                } else {
-                    pc.body->is<physx::PxRigidStatic>()->setGlobalPose(transform);
-                }
-            }
-        }
 
         GUI::end_properties();
     }
@@ -346,7 +332,7 @@ namespace Stellar {
         slc.outer_cut_off = node["OuterCutOff"].as<f32>();
     }
 
-    void RigidBodyComponent::draw(const std::shared_ptr<Physics>& physics, Entity& entity) {
+    void RigidBodyComponent::draw() {
         GUI::begin_properties();
 
         if(rigid_body_type == RigidBodyType::Dynamic) {

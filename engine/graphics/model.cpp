@@ -661,4 +661,29 @@ namespace Stellar {
             }
         }
     }
+
+    void Model::draw(daxa::CommandList& cmd_list, SkyPush& draw_push) {
+        draw_push.vertex_buffer = device.get_device_address(face_buffer);
+        for (auto & primitive : primitives) {
+            cmd_list.push_constant(draw_push);
+
+            if (primitive.index_count > 0) {
+                cmd_list.set_index_buffer(index_buffer, 0, 4);
+                cmd_list.draw_indexed({
+                    .index_count = primitive.index_count,
+                    .instance_count = 1,
+                    .first_index = primitive.first_index,
+                    .vertex_offset = static_cast<i32>(primitive.first_vertex),
+                    .first_instance = 0,
+                });
+            } else {
+                cmd_list.draw({
+                    .vertex_count = primitive.vertex_count,
+                    .instance_count = 1,
+                    .first_vertex = primitive.first_vertex,
+                    .first_instance = 0
+                });
+            }
+        }
+    }
 }

@@ -4,10 +4,10 @@
 #include <daxa/daxa.hpp>
 
 #include <graphics/texture.hpp>
-
 #include "../../shaders/shared.inl"
 
 namespace Stellar {
+
     struct Primitive {
         u32 first_index;
         u32 first_vertex;
@@ -23,6 +23,7 @@ namespace Stellar {
         void draw(daxa::CommandList& cmd_list, DepthPrepassPush& draw_push);
         void draw(daxa::CommandList& cmd_list, DrawPush& draw_push);
         void draw(daxa::CommandList& cmd_list, ShadowPush& draw_push);
+        void draw(daxa::CommandList& cmd_list, SkyPush& draw_push);
 
         daxa::Device device;
         daxa::BufferId face_buffer = {};

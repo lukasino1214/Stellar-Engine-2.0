@@ -6,6 +6,8 @@
 #include <glm/gtx/quaternion.hpp>
 #include <cstring>
 #include "../../shaders/shared.inl"
+#define NDEBUG true
+#include <PxPhysicsAPI.h>
 #include <physics/physics.hpp>
 
 namespace Stellar {
@@ -19,7 +21,7 @@ namespace Stellar {
         return get_component<UUIDComponent>().uuid;
     }
 
-    void Entity::update(daxa::Device& device, const std::shared_ptr<Physics>& physics) {
+    void Entity::update(daxa::Device& device) {
         if(has_component<CameraComponent>()) {
             auto& cc = get_component<CameraComponent>();
             if(cc.is_dirty) {
@@ -36,7 +38,23 @@ namespace Stellar {
             if(has_component<RigidBodyComponent>()) {
                 auto& pc = get_component<RigidBodyComponent>();
 
+
+                if(pc.body != nullptr && tc.is_dirty) {
+                    glm::quat a = glm::quat(glm::radians(tc.rotation));
+                    physx::PxTransform transform;
+                    transform.p = physx::PxVec3(tc.position.x, tc.position.y, tc.position.z),
+                    transform.q = physx::PxQuat(a.x, a.y, a.z, a.w);
+
+                    if(pc.rigid_body_type == RigidBodyType::Dynamic) {
+                        pc.body->is<physx::PxRigidDynamic>()->setGlobalPose(transform);
+                    } else {
+                        pc.body->is<physx::PxRigidStatic>()->setGlobalPose(transform);
+                    }
+                }
+
                 if(pc.is_dirty || pc.body == nullptr) {
+                    auto& physics = scene->physics;
+
                     if(pc.body != nullptr) {
                         physics->gScene->removeActor(*pc.body);
                         pc.shape->release();

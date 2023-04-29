@@ -7,6 +7,10 @@
 
 #include <glm/gtx/matrix_decompose.hpp>
 
+#define NDEBUG true
+#include <PxPhysicsAPI.h>
+#include <physics/physics.hpp>
+
 namespace Stellar {
     void ViewportPanel::draw(daxa::ImageId image, const std::shared_ptr<Window>& window, const std::unique_ptr<SceneHiearchyPanel> &scene_hiearchy_panel, ControlledCamera3D &camera) {
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));

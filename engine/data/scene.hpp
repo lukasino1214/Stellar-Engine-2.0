@@ -2,9 +2,10 @@
 
 #include <entt/entt.hpp>
 
-#include <data/components.hpp>
+//#include <data/components.hpp>
+#include <core/uuid.hpp>
 #include <core/types.hpp>
-#include <physics/physics.hpp>
+//#include <physics/physics.hpp>
 
 #include <functional>
 
@@ -12,9 +13,10 @@
 
 namespace Stellar {
     struct Entity;
+    struct Physics;
 
     struct Scene {
-        explicit Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager, const std::shared_ptr<Physics>& _physics);
+        explicit Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager);
         ~Scene();
 
         auto create_entity(const std::string_view& _name) -> Entity;
@@ -31,10 +33,12 @@ namespace Stellar {
 
         void update();
 
+        void physics_update(f32 delta_time);
+
         std::string name;
         std::unique_ptr<entt::registry> registry;
         daxa::Device device;
-        std::shared_ptr<Physics> physics;
+        std::unique_ptr<Physics> physics;
 
         daxa::BufferId light_buffer;
 

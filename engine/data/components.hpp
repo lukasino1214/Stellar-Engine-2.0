@@ -4,18 +4,26 @@
 #include <core/uuid.hpp>
 #include <entt/entt.hpp>
 #include <graphics/camera.hpp>
-#include <graphics/model.hpp>
-#include <physics/physics.hpp>
+//#include <graphics/model.hpp>
+#include <daxa/daxa.hpp>
+#include <physics/types.hpp>
 
 namespace YAML {
     struct Emitter;
     struct Node;
 };
 
+namespace physx {
+    struct PxMaterial;
+    struct PxShape;
+    struct PxActor;
+};
+
 //#include <yaml-cpp/yaml.h>
 
 namespace Stellar {
     struct Entity;
+    struct Model;
 
     struct UUIDComponent {
         UUID uuid = UUID();
@@ -55,7 +63,7 @@ namespace Stellar {
 
         daxa::BufferId transform_buffer;
 
-        void draw(Entity& entity);
+        void draw();
 
         static void serialize(YAML::Emitter& out, Entity& entity);
         static void deserialize(YAML::Node& node, Entity& entity);
@@ -147,7 +155,7 @@ namespace Stellar {
         f32 dynamic_friction = 0.5f;
         f32 restitution = 0.5f;
 
-        void draw(const std::shared_ptr<Physics>& physics, Entity& entity);
+        void draw();
 
         static void serialize(YAML::Emitter& out, Entity& entity);
         static void deserialize(YAML::Node& node, Entity& entity);

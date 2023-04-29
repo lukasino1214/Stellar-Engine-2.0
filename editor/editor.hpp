@@ -16,7 +16,8 @@
 #include <core/window.hpp>
 #include <graphics/model.hpp>
 
-#include <physics/physics.hpp>
+#include <systems/ssao_system.hpp>
+#include <systems/deffered_rendering_system.hpp>
 
 namespace Stellar {
     struct Context {
@@ -48,13 +49,6 @@ namespace Stellar {
         u32 size_x;
         u32 size_y;
 
-        daxa::ImageId albedo_image;
-        daxa::ImageId normal_image;
-        daxa::ImageId render_image;
-        daxa::ImageId depth_image;
-        daxa::ImageId ssao_image;
-        daxa::ImageId ssao_blur_image;
-
         daxa::ImageId displayed_image;
 
         bool show_render = false;
@@ -64,14 +58,7 @@ namespace Stellar {
 
         daxa::SamplerId sampler;
 
-        std::shared_ptr<Physics> physics;
-
-        std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
-        std::shared_ptr<daxa::RasterPipeline> deffered_pipeline;
-        std::shared_ptr<daxa::RasterPipeline> composition_pipeline;
         std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
-        std::shared_ptr<daxa::RasterPipeline> ssao_generation_pipeline;
-        std::shared_ptr<daxa::RasterPipeline> ssao_blur_pipeline;
         std::shared_ptr<daxa::RasterPipeline> atmosphere_pipeline;
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;
@@ -80,6 +67,9 @@ namespace Stellar {
         std::unique_ptr<PerformanceStatsPanel> performance_stats_panel;
         std::unique_ptr<LoggerPanel> logger_panel;
         std::unique_ptr<ViewportPanel> viewport_panel;
+
+        std::unique_ptr<SSAOSystem> ssao_system;
+        std::unique_ptr<DefferedRenderingSystem> deffered_rendering_system;
 
         std::unique_ptr<Texture> directional_light_texture;
         std::unique_ptr<Texture> point_light_texture;
@@ -94,6 +84,6 @@ namespace Stellar {
         daxa::BufferId editor_camera_buffer;
         std::shared_ptr<Scene> scene;
 
-        daxa::BufferId face_buffer;
+        std::unique_ptr<Model> cube_model;
     };
 }

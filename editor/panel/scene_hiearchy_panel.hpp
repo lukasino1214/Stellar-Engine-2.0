@@ -3,11 +3,10 @@
 #include <core/types.hpp>
 #include <data/scene.hpp>
 #include <data/entity.hpp>
-#include <physics/physics.hpp>
 
 namespace Stellar {
     struct SceneHiearchyPanel {
-        explicit SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene, const std::shared_ptr<Physics>& _physics);
+        explicit SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene);
         ~SceneHiearchyPanel() = default;
 
         void draw();
@@ -21,6 +20,5 @@ namespace Stellar {
 
         Entity selected_entity;
         std::shared_ptr<Scene> scene;
-        std::shared_ptr<Physics> physics;
     };
 }

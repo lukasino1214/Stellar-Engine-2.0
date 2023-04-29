@@ -16,11 +16,15 @@ DAXA_USE_PUSH_CONSTANT(SkyPush)
 
 #if defined(DRAW_VERT)
 
+out gl_PerVertex {
+    vec4 gl_Position;
+};
+
 layout(location = 0) out f32vec3 out_position;
 
 void main() {
     out_position = deref(daxa_push_constant.vertex_buffer[gl_VertexIndex]).position;
-    gl_Position = CAMERA.projection_matrix * CAMERA.view_matrix * daxa_push_constant.model_matrix * f32vec4(deref(daxa_push_constant.vertex_buffer[gl_VertexIndex]).position, 1.0);
+    gl_Position = (CAMERA.projection_matrix * CAMERA.view_matrix * daxa_push_constant.model_matrix * f32vec4(deref(daxa_push_constant.vertex_buffer[gl_VertexIndex]).position, 1.0)).xyww;
 }
 
 #elif defined(DRAW_FRAG)

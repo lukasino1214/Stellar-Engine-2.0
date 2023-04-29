@@ -42,10 +42,6 @@ namespace Stellar {
             if (open) {
                 if constexpr(std::is_same_v<T, ModelComponent>) {
                     component.draw(scene->device);
-                } else if constexpr(std::is_same_v<T, RigidBodyComponent>) {
-                    component.draw(physics, entity);
-                } else if constexpr(std::is_same_v<T, TransformComponent>) {
-                    component.draw(entity);
                 } else {
                     component.draw();
                 }
@@ -80,7 +76,7 @@ namespace Stellar {
         }
     }
 
-    SceneHiearchyPanel::SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene, const std::shared_ptr<Physics>& _physics) : scene{_scene}, physics{_physics} {}
+    SceneHiearchyPanel::SceneHiearchyPanel(const std::shared_ptr<Scene>& _scene) : scene{_scene} {}
 
     void SceneHiearchyPanel::tree(Entity& entity, const RelationshipComponent &relationship_component, const u32 iteration) {
         ImGuiTreeNodeFlags treeNodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_SpanAvailWidth;

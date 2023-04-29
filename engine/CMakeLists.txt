@@ -23,7 +23,8 @@ target_sources(${PROJECT_NAME} PRIVATE
     "utils/gui.hpp"
     "utils/gui.cpp"
     "utils/threadpool.hpp"
-    
+    "systems/ssao_system.cpp"
+    "systems/deffered_rendering_system.cpp"
 )
 
 set_project_warnings(${PROJECT_NAME})

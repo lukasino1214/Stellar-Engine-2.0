@@ -146,7 +146,7 @@ struct SimpleVertex {
 DAXA_ENABLE_BUFFER_PTR(SimpleVertex)
 
 struct SkyPush {
-    daxa_RWBufferPtr(SimpleVertex) vertex_buffer;
+    daxa_RWBufferPtr(Vertex) vertex_buffer;
     daxa_f32mat4x4 model_matrix;
     daxa_f32vec3 sun_position;
     daxa_RWBufferPtr(CameraInfo) camera_info;
