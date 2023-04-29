@@ -7,17 +7,32 @@
 #include <graphics/model.hpp>
 #include <physics/physics.hpp>
 
+namespace YAML {
+    struct Emitter;
+    struct Node;
+};
+
+//#include <yaml-cpp/yaml.h>
+
 namespace Stellar {
+    struct Entity;
+
     struct UUIDComponent {
         UUID uuid = UUID();
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct TagComponent {
         std::string name = "Empty Entity";
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct RelationshipComponent {
@@ -25,9 +40,10 @@ namespace Stellar {
         std::vector<entt::entity> children = {};
 
         void draw();
-    };
 
-    struct Entity;
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
+    };
 
     struct TransformComponent {
         glm::vec3 position = { 0.0f, 0.0f, 0.0f };
@@ -40,6 +56,9 @@ namespace Stellar {
         daxa::BufferId transform_buffer;
 
         void draw(Entity& entity);
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct CameraComponent {
@@ -47,6 +66,9 @@ namespace Stellar {
         bool is_dirty = true;
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct ModelComponent {
@@ -54,6 +76,9 @@ namespace Stellar {
         std::shared_ptr<Model> model;
 
         void draw(daxa::Device device);
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity, daxa::Device& device);
     };
 
     struct ShadowInfo {
@@ -74,6 +99,9 @@ namespace Stellar {
         ShadowInfo shadow_info;
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct PointLightComponent {
@@ -82,6 +110,9 @@ namespace Stellar {
         bool is_dirty = true;
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct SpotLightComponent {
@@ -93,12 +124,16 @@ namespace Stellar {
         ShadowInfo shadow_info;
 
         void draw();
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 
     struct RigidBodyComponent {
         physx::PxMaterial* material = nullptr;
         physx::PxShape* shape = nullptr;
         physx::PxActor* body = nullptr;
+        bool is_dirty = true;
 
         RigidBodyType rigid_body_type = RigidBodyType::Static;
         GeometryType geometry_type = GeometryType::Box;
@@ -113,5 +148,8 @@ namespace Stellar {
         f32 restitution = 0.5f;
 
         void draw(const std::shared_ptr<Physics>& physics, Entity& entity);
+
+        static void serialize(YAML::Emitter& out, Entity& entity);
+        static void deserialize(YAML::Node& node, Entity& entity);
     };
 }

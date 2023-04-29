@@ -5,6 +5,8 @@
 #include <data/scene.hpp>
 
 namespace Stellar {
+    struct Physics;
+
     struct Entity {
         Entity() = default;
 		Entity(entt::entity _handle, Scene* _scene);
@@ -54,7 +56,7 @@ namespace Stellar {
             scene->registry->remove<T>(handle);
         }
 
-        void update(daxa::Device& device);
+        void update(daxa::Device& device, const std::shared_ptr<Physics>& physics);
 
         entt::entity handle{ entt::null };
 		Scene* scene = nullptr;

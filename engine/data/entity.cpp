@@ -6,6 +6,7 @@
 #include <glm/gtx/quaternion.hpp>
 #include <cstring>
 #include "../../shaders/shared.inl"
+#include <physics/physics.hpp>
 
 namespace Stellar {
     Entity::Entity(entt::entity _handle, Scene* _scene) : handle{_handle}, scene{_scene} {}
@@ -18,7 +19,7 @@ namespace Stellar {
         return get_component<UUIDComponent>().uuid;
     }
 
-    void Entity::update(daxa::Device& device) {
+    void Entity::update(daxa::Device& device, const std::shared_ptr<Physics>& physics) {
         if(has_component<CameraComponent>()) {
             auto& cc = get_component<CameraComponent>();
             if(cc.is_dirty) {
@@ -34,18 +35,56 @@ namespace Stellar {
 
             if(has_component<RigidBodyComponent>()) {
                 auto& pc = get_component<RigidBodyComponent>();
-                if(pc.body != nullptr) {
-                    physx::PxTransform t;
-                    if(pc.rigid_body_type == RigidBodyType::Dynamic) {
-                        t = pc.body->is<physx::PxRigidDynamic>()->getGlobalPose();
-                    } else {
-                        t = pc.body->is<physx::PxRigidStatic>()->getGlobalPose();
+
+                if(pc.is_dirty || pc.body == nullptr) {
+                    if(pc.body != nullptr) {
+                        physics->gScene->removeActor(*pc.body);
+                        pc.shape->release();
+                        pc.material->release();
                     }
-                    tc.position = { t.p.x, t.p.y, t.p.z };
-                    glm::vec3 rotation_radians = glm::eulerAngles(glm::quat{ t.q.w, t.q.x, t.q.y, t.q.z });
-                    tc.rotation = glm::degrees(rotation_radians);
-                    tc.is_dirty = true;
+
+                    pc.material = physics->gPhysics->createMaterial(pc.static_friction, pc.dynamic_friction, pc.restitution);
+
+                    if(pc.geometry_type == GeometryType::Sphere) {
+                        pc.shape = physics->gPhysics->createShape(physx::PxSphereGeometry(pc.radius), *pc.material);
+                    } else if(pc.geometry_type == GeometryType::Capsule) {
+                        pc.shape = physics->gPhysics->createShape(physx::PxCapsuleGeometry(pc.radius, pc.half_height), *pc.material);
+                    } else {
+                        pc.shape = physics->gPhysics->createShape(physx::PxBoxGeometry(pc.half_extent.x, pc.half_extent.y, pc.half_extent.z), *pc.material);
+                    }
+
+                    glm::quat a = glm::quat(glm::radians(tc.rotation));
+                    physx::PxTransform transform;
+                    transform.p = physx::PxVec3(tc.position.x, tc.position.y, tc.position.z),
+                    transform.q = physx::PxQuat(a.x, a.y, a.z, a.w);
+
+                    if(pc.rigid_body_type == RigidBodyType::Static) {
+                        physx::PxRigidStatic* temp_body = physics->gPhysics->createRigidStatic(physx::PxTransform(physx::PxVec3(tc.position.x, tc.position.y, tc.position.z)));;
+                        temp_body->attachShape(*pc.shape);
+                        temp_body->setGlobalPose(transform);
+                        pc.body = temp_body->is<physx::PxActor>();
+                    } else {
+                        physx::PxRigidDynamic* temp_body = physics->gPhysics->createRigidDynamic(physx::PxTransform(physx::PxVec3(tc.position.x, tc.position.y, tc.position.z)));
+                        temp_body->attachShape(*pc.shape);
+                        physx::PxRigidBodyExt::updateMassAndInertia(*temp_body, pc.density);
+                        temp_body->setGlobalPose(transform);
+                        pc.body = temp_body->is<physx::PxActor>();
+                    }
+
+                    physics->gScene->addActor(*pc.body);
+                    pc.is_dirty = false;
                 }
+
+                physx::PxTransform t;
+                if(pc.rigid_body_type == RigidBodyType::Dynamic) {
+                    t = pc.body->is<physx::PxRigidDynamic>()->getGlobalPose();
+                } else {
+                    t = pc.body->is<physx::PxRigidStatic>()->getGlobalPose();
+                }
+                tc.position = { t.p.x, t.p.y, t.p.z };
+                glm::vec3 rotation_radians = glm::eulerAngles(glm::quat{ t.q.w, t.q.x, t.q.y, t.q.z });
+                tc.rotation = glm::degrees(rotation_radians);
+                tc.is_dirty = true;
             }
 
             if(tc.is_dirty) {

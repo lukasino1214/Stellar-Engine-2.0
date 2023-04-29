@@ -68,7 +68,7 @@ namespace YAML {
     };
 }
 
-YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec3 &v) {
+/*YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec3 &v) {
     out << YAML::Flow;
     out << YAML::BeginSeq << v.x << v.y << v.z << YAML::EndSeq;
     return out;
@@ -78,7 +78,7 @@ YAML::Emitter &operator<<(YAML::Emitter &out, const glm::vec4 &v) {
     out << YAML::Flow;
     out << YAML::BeginSeq << v.x << v.y << v.z << v.w << YAML::EndSeq;
     return out;
-}
+}*/
 
 namespace Stellar {
     Scene::Scene(const std::string_view& _name, daxa::Device _device, daxa::PipelineManager& pipeline_manager, const std::shared_ptr<Physics>& _physics) : name{_name}, device{_device}, physics{_physics} {
@@ -259,106 +259,35 @@ namespace Stellar {
             out << YAML::BeginMap;
             out << YAML::Key << "Entity" << YAML::Value << entity.get_uuid();
             if(entity.has_component<TagComponent>()) {
-                out << YAML::Key << "TagComponent";
-                out << YAML::BeginMap;
-
-                out << YAML::Key << "Tag" << YAML::Value << entity.get_component<TagComponent>().name;
-
-                out << YAML::EndMap;
+                TagComponent::serialize(out, entity);
             }
 
             if(entity.has_component<RelationshipComponent>()) {
-                out << YAML::Key << "RelationshipComponent";
-                out << YAML::BeginMap;
-
-                auto& rc = entity.get_component<RelationshipComponent>();
-                Entity parent { rc.parent, this };
-                u64 parent_uuid = parent ? parent.get_component<UUIDComponent>().uuid.uuid : 0;
-                out << YAML::Key << "Parent" << YAML::Value << parent_uuid;
-                
-                out << YAML::Key << "Children" << YAML::Value << YAML::BeginSeq;
-
-                for(auto& _child : rc.children) {
-                    Entity child { _child, this };
-                    if(!child) { continue; }
-                    u64 child_uuid = child ? child.get_component<UUIDComponent>().uuid.uuid : 0;
-
-                    out << YAML::Value << child_uuid;
-                }
-
-                out << YAML::EndSeq;
-
-                out << YAML::EndMap;
+                RelationshipComponent::serialize(out, entity);
             }
 
             if(entity.has_component<TransformComponent>()) {
-                out << YAML::Key << "TransformComponent";
-                out << YAML::BeginMap;
-
-                auto& tc = entity.get_component<TransformComponent>();
-                out << YAML::Key << "Position" << YAML::Value << tc.position;
-                out << YAML::Key << "Rotation" << YAML::Value << tc.rotation;
-                out << YAML::Key << "Scale" << YAML::Value << tc.scale;
-
-                out << YAML::EndMap;
+                TransformComponent::serialize(out, entity);
             }
 
             if(entity.has_component<CameraComponent>()) {
-                out << YAML::Key << "CameraComponent";
-                out << YAML::BeginMap;
-
-                auto& cc = entity.get_component<CameraComponent>();
-                out << YAML::Key << "FOV" << YAML::Value << cc.camera.fov;
-                out << YAML::Key << "Aspect" << YAML::Value << cc.camera.aspect;
-                out << YAML::Key << "NearPlane" << YAML::Value << cc.camera.near_clip;
-                out << YAML::Key << "FarPlane" << YAML::Value << cc.camera.far_clip;
-
-                out << YAML::EndMap;
+                CameraComponent::serialize(out, entity);
             }
 
             if(entity.has_component<ModelComponent>()) {
-                out << YAML::Key << "ModelComponent";
-                out << YAML::BeginMap;
-
-                auto& mc = entity.get_component<ModelComponent>();
-                out << YAML::Key << "Filepath" << YAML::Value << mc.file_path;
-
-                out << YAML::EndMap;
+                ModelComponent::serialize(out, entity);
             }
 
             if(entity.has_component<DirectionalLightComponent>()) {
-                out << YAML::Key << "DirectionalLightComponent";
-                out << YAML::BeginMap;
-
-                auto& dlc = entity.get_component<DirectionalLightComponent>();
-                out << YAML::Key << "Color" << YAML::Value << dlc.color;
-                out << YAML::Key << "Intensity" << YAML::Value << dlc.intensity;
-
-                out << YAML::EndMap;
+                DirectionalLightComponent::serialize(out, entity);
             }
 
             if(entity.has_component<PointLightComponent>()) {
-                out << YAML::Key << "PointLightComponent";
-                out << YAML::BeginMap;
-
-                auto& plc = entity.get_component<PointLightComponent>();
-                out << YAML::Key << "Color" << YAML::Value << plc.color;
-                out << YAML::Key << "Intensity" << YAML::Value << plc.intensity;
-
-                out << YAML::EndMap;
+                PointLightComponent::serialize(out, entity);
             }
 
             if(entity.has_component<SpotLightComponent>()) {
-                out << YAML::Key << "SpotLightComponent";
-                out << YAML::BeginMap;
-
-                auto& slc = entity.get_component<SpotLightComponent>();
-                out << YAML::Key << "Color" << YAML::Value << slc.color;
-                out << YAML::Key << "Intensity" << YAML::Value << slc.intensity;
-                out << YAML::Key << "CutOff" << YAML::Value << slc.cut_off;
-                out << YAML::Key << "OuterCutOff" << YAML::Value << slc.outer_cut_off;
-
-                out << YAML::EndMap;
+                SpotLightComponent::serialize(out, entity);
             }
 
             out << YAML::EndMap;
@@ -389,51 +318,32 @@ namespace Stellar {
 
             auto transform_component = entity["TransformComponent"];
             if (transform_component) {
-                auto &tc = deserialized_entity.add_component<TransformComponent>();
-                tc.position = transform_component["Position"].as<glm::vec3>();
-                tc.rotation = transform_component["Rotation"].as<glm::vec3>();
-                tc.scale = transform_component["Scale"].as<glm::vec3>();
-                tc.is_dirty = true;
+                TransformComponent::deserialize(transform_component, deserialized_entity);
             }
 
             auto camera_component = entity["CameraComponent"];
             if (camera_component) {
-                auto &cc = deserialized_entity.add_component<CameraComponent>();
-                cc.camera.fov = camera_component["FOV"].as<f32>();
-                cc.camera.aspect = camera_component["Aspect"].as<f32>();
-                cc.camera.near_clip = camera_component["NearPlane"].as<f32>();
-                cc.camera.far_clip = camera_component["FarPlane"].as<f32>();
-                cc.is_dirty = true;
+                CameraComponent::deserialize(camera_component, deserialized_entity);
             }
 
             auto model_component = entity["ModelComponent"];
             if (model_component) {
-                auto& mc = deserialized_entity.add_component<ModelComponent>();
-                mc.file_path = model_component["Filepath"].as<std::string>();
-                mc.model = std::make_shared<Model>(device, mc.file_path);
+                ModelComponent::deserialize(model_component, deserialized_entity, device);
             }
 
             auto directional_light_component = entity["DirectionalLightComponent"];
             if (directional_light_component) {
-                auto& dlc = deserialized_entity.add_component<DirectionalLightComponent>();
-                dlc.color = directional_light_component["Color"].as<glm::vec3>();
-                dlc.intensity = directional_light_component["Intensity"].as<f32>();
+                DirectionalLightComponent::deserialize(directional_light_component, deserialized_entity);
             }
 
             auto point_light_component = entity["PointLightComponent"];
             if (point_light_component) {
-                auto& plc = deserialized_entity.add_component<PointLightComponent>();
-                plc.color = point_light_component["Color"].as<glm::vec3>();
-                plc.intensity = point_light_component["Intensity"].as<f32>();
+                PointLightComponent::deserialize(point_light_component, deserialized_entity);
             }
 
             auto spot_light_component = entity["SpotLightComponent"];
             if (spot_light_component) {
-                auto& slc = deserialized_entity.add_component<SpotLightComponent>();
-                slc.color = point_light_component["Color"].as<glm::vec3>();
-                slc.intensity = point_light_component["Intensity"].as<f32>();
-                slc.cut_off = point_light_component["CutOff"].as<f32>();
-                slc.outer_cut_off = point_light_component["OuterCutOff"].as<f32>();
+                SpotLightComponent::deserialize(spot_light_component, deserialized_entity);
             }
         }
 
@@ -477,7 +387,6 @@ namespace Stellar {
     }
 
     void Scene::reset() {
-        // TODO: add reset function later flecs::world().reset()
         registry = std::make_unique<entt::registry>();
     }
 
@@ -825,7 +734,7 @@ namespace Stellar {
         }
 
         iterate([&](Entity entity){
-            entity.update(device);
+            entity.update(device, physics);
         });
 
         auto cmd_list = device.create_command_list({

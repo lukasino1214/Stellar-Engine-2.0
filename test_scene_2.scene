@@ -1,0 +1,55 @@
+Scene: Test
+Entities:
+  - Entity: 17893281726515523789
+    TagComponent:
+      Tag: Directional Light
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        []
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [9.99999975e-05, 9.99999975e-05, 9.99999975e-05]
+      Scale: [1, 1, 1]
+    DirectionalLightComponent:
+      Color: [1, 1, 1]
+      Intensity: 1
+  - Entity: 2492474968445572470
+    TagComponent:
+      Tag: lol
+    RelationshipComponent:
+      Parent: 4656098338271287123
+      Children:
+        []
+  - Entity: 18161999442681280284
+    TagComponent:
+      Tag: test
+    RelationshipComponent:
+      Parent: 4656098338271287123
+      Children:
+        []
+  - Entity: 4656098338271287123
+    TagComponent:
+      Tag: pog
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        - 18161999442681280284
+        - 2492474968445572470
+    TransformComponent:
+      Position: [1, 2, 3]
+      Rotation: [80, 60, 20]
+      Scale: [1, 1, 1]
+  - Entity: 9726060176332043958
+    TagComponent:
+      Tag: Sponza
+    RelationshipComponent:
+      Parent: 0
+      Children:
+        []
+    TransformComponent:
+      Position: [0, 0, 0]
+      Rotation: [0, 0, 0]
+      Scale: [1, 1, 1]
+    ModelComponent:
+      Filepath: models/Sponza/Sponza.gltf

@@ -65,8 +65,6 @@ namespace Stellar {
         daxa::SamplerId sampler;
 
         std::shared_ptr<Physics> physics;
-        Entity test_cube;
-        physx::PxRigidDynamic* body;
 
         std::shared_ptr<daxa::RasterPipeline> depth_prepass_pipeline;
         std::shared_ptr<daxa::RasterPipeline> deffered_pipeline;

@@ -38,7 +38,6 @@ namespace Stellar {
         scene = std::make_shared<Scene>("Test", context.device, context.pipeline_manager, physics);
         scene->deserialize("test.scene");
 
-
         scene_hiearchy_panel = std::make_unique<SceneHiearchyPanel>(scene, physics);
         asset_browser_panel = std::make_unique<AssetBrowserPanel>(project_path);
         toolbar_panel = std::make_unique<ToolbarPanel>(window);
@@ -226,7 +225,7 @@ namespace Stellar {
             .debug_name = "ssao_blur_pipeline",
         }).value();
 
-        editor_camera.camera.resize(size_x, size_y);
+        editor_camera.camera.resize(static_cast<i32>(size_x), static_cast<i32>(size_y));
 
         Entity e = scene->create_entity("Directional Light");
         e.add_component<TransformComponent>();
@@ -331,96 +330,6 @@ namespace Stellar {
         context.device.submit_commands({
             .command_lists = {std::move(cmd_list)},
         });
-
-        /*{
-            Entity eaa = scene->create_entity("bruh");
-            auto m = std::make_shared<Model>(context.device, "models/glTF/BarramundiFish.gltf");
-            for(auto& p : m->primitives) {
-                std::cout << p.index_count << std::endl;
-            }
-            auto& mc = eaa.add_component<ModelComponent>();
-            mc.model = m;
-            eaa.add_component<TransformComponent>();
-        }*/
-
-        /*std::cout << "----" << std::endl;
-
-        {
-            Entity eaa = scene->create_entity("bruh 2");
-            auto m = std::make_shared<Model>(context.device, "models/FlightHelmet/glTF/FlightHelmet.gltf");
-            
-            for(auto& p : m->primitives) {
-                std::cout << p.index_count << std::endl;
-            }
-            auto& mc = eaa.add_component<ModelComponent>();
-            mc.model = m;
-            auto& tc = eaa.add_component<TransformComponent>();
-            tc.position.x = 2.0f;
-        }
-
-        std::cout << "----" << std::endl;
-
-        {
-            Entity eaa = scene->create_entity("bruh 2");
-            auto m = std::make_shared<Model>(context.device, "models/FlightHelmet/glTF/FlightHelmet.gltf");
-            
-            for(auto& p : m->primitives) {
-                std::cout << p.index_count << std::endl;
-            }
-            auto& mc = eaa.add_component<ModelComponent>();
-            mc.model = m;
-            auto& tc = eaa.add_component<TransformComponent>();
-            tc.position.x = 2.0f;
-        }
-
-        std::cout << "----" << std::endl;
-
-        {
-            Entity eaa = scene->create_entity("bruh 3");
-            auto m = std::make_shared<Model>(context.device, "models/ABeautifulGame/glTF/ABeautifulGame.gltf");
-            
-            for(auto& p : m->primitives) {
-                std::cout << p.index_count << std::endl;
-            }
-            auto& mc = eaa.add_component<ModelComponent>();
-            mc.model = m;
-            auto& tc = eaa.add_component<TransformComponent>();
-            tc.position.x = 4.0f;
-        }*/
-
-        physx::PxMaterial* material = physics->gPhysics->createMaterial(0.5f, 0.5f, 0.6f);
-
-        physx::PxShape* shape = physics->gPhysics->createShape(physx::PxBoxGeometry(0.5f, 0.5f, 0.5f), *material);
-        
-        body = physics->gPhysics->createRigidDynamic(physx::PxTransform(physx::PxVec3(0.0f, 50.0f, 0.0f)));
-
-        body->attachShape(*shape);
-        physx::PxRigidBodyExt::updateMassAndInertia(*body, 20.0f);
-
-        physics->gScene->addActor(*body);
-
-        //physx::PxRigidStatic* groundPlane = physx::PxCreatePlane(*physics->gPhysics, physx::PxPlane(physx::PxVec3(0.0f, 0.0f, 0.0f), physx::PxVec3(0.0f, 1.0f, 0.0f)), *material);
-        //physics->gScene->addActor(*groundPlane);
-
-        //physx::PxCreateStatic()
-        physx::PxRigidStatic* cube_floor = physics->gPhysics->createRigidStatic(physx::PxTransform(physx::PxVec3(0.0f, 0.0f, 0.0f)));
-        physx::PxShape* floor_shape = physics->gPhysics->createShape(physx::PxBoxGeometry(5.5f, 0.5f, 5.5f), *material);
-        cube_floor->attachShape(*floor_shape);
-        physics->gScene->addActor(*cube_floor);
-
-        /*for(u32 i = 0; i < 10000; i++) {
-            physics->step(1.0f/60.0f);
-            auto t = body->getGlobalPose();
-            std::cout << t.p.x << " " << t.p.y << " " << t.p.z << std::endl;
-        }*/
-
-
-        test_cube = scene->create_entity("test_cube");
-        test_cube.add_component<TransformComponent>();
-        auto m = std::make_shared<Model>(context.device, "models/cube.gltf");
-        auto& mc = test_cube.add_component<ModelComponent>();
-        mc.model = m;
-
     }
 
     Editor::~Editor() {
@@ -567,24 +476,19 @@ namespace Stellar {
         if(ImGui::Checkbox("SSAO image", &show_ssao)) { displayed_image = ssao_blur_image; }
         ImGui::End();
 
+        ImGui::Begin("TEST");
+
+        if(ImGui::Button("save")) {
+            scene->serialize("test_scene_2.scene");
+        }
+
+        ImGui::End();
+
         ImGui::Render();
     }
 
     void Editor::render() {
-
-        if(toolbar_panel->play && deltaTime > 0.0) {
-            auto& _tc = test_cube.get_component<TransformComponent>();
-            auto t = body->getGlobalPose();
-            _tc.position = { t.p.x, t.p.y, t.p.z };
-            glm::vec3 rotation_radians = glm::eulerAngles(glm::quat{ t.q.w, t.q.x, t.q.y, t.q.z });
-            _tc.rotation = glm::degrees(rotation_radians);
-            _tc.is_dirty = true;
-
-            //physics->step(deltaTime);
-        }
-
         scene->update();
-
 
         daxa::ImageId swapchain_image = swapchain.acquire_next_image();
         if(swapchain_image.is_empty()) { return; }
@@ -900,7 +804,7 @@ namespace Stellar {
         });
     }
 
-    void Editor::on_resize(u32 sx, u32 sy) {
+    void Editor::on_resize(u32, u32) {
         //window.minimized = (sx == 0 || sy == 0);
         //if (!window.minimized) {
             //rendering_system->resize(sx, sy);
