@@ -59,6 +59,7 @@ namespace Stellar {
         daxa::SamplerId sampler;
 
         std::shared_ptr<daxa::RasterPipeline> billboard_pipeline;
+        std::shared_ptr<daxa::RasterPipeline> lines_pipeline;
         std::shared_ptr<daxa::RasterPipeline> atmosphere_pipeline;
 
         std::unique_ptr<SceneHiearchyPanel> scene_hiearchy_panel;

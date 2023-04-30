@@ -5,15 +5,16 @@
 
 #include <graphics/texture.hpp>
 #include "../../shaders/shared.inl"
+#include <physics/aabb.hpp>
 
 namespace Stellar {
-
     struct Primitive {
         u32 first_index;
         u32 first_vertex;
         u32 index_count;
         u32 vertex_count;
         u32 material_index;
+        AABB aabb;
     };
 
     struct Model {

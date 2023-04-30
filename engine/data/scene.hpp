@@ -41,6 +41,8 @@ namespace Stellar {
         std::unique_ptr<Physics> physics;
 
         daxa::BufferId light_buffer;
+        daxa::BufferId lines_buffer;
+        u32 lines_vertices;
 
         std::shared_ptr<daxa::RasterPipeline> normal_shadow_pipeline;
         std::shared_ptr<daxa::RasterPipeline> variance_shadow_pipeline;

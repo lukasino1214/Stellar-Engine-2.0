@@ -194,7 +194,7 @@ namespace Stellar {
         });
 
         device.destroy_sampler(pcf_sampler);
-
+        device.destroy_buffer(lines_buffer);
         device.destroy_buffer(light_buffer);
     }
 
@@ -397,10 +397,17 @@ namespace Stellar {
 
     void Scene::update() {
         bool light_updated = false;
+        bool update_aabb = false;
 
         iterate([&](Entity entity){
             if(entity.has_component<TransformComponent>()) {
                 if(entity.get_component<TransformComponent>().is_dirty) {
+                    if(entity.has_component<ModelComponent>()) {
+                        if(entity.get_component<ModelComponent>().model) {
+                            update_aabb = true;
+                        }
+                    }
+
                     if(entity.has_component<DirectionalLightComponent>() || entity.has_component<PointLightComponent>() || entity.has_component<SpotLightComponent>()) {
                         light_updated = true;
                     }
@@ -746,6 +753,110 @@ namespace Stellar {
         device.submit_commands({
             .command_lists = {std::move(cmd_list)},
         });
+
+        if(update_aabb) {
+            std::vector<glm::vec3> lines = {};
+            iterate([&](Entity entity){
+                if(entity.has_component<ModelComponent>()) {
+                    auto& mc = entity.get_component<ModelComponent>();
+                    if(!mc.model) { return; }
+                    auto& tc = entity.get_component<TransformComponent>();
+
+                    for(auto& primitive : mc.model->primitives) {
+                        /*std::cout << "-----------AABB------------" << std::endl;
+                        std::cout << "min: " << primitive.aabb.min.x << " " << primitive.aabb.min.y << " " << primitive.aabb.min.z << std::endl;
+                        std::cout << "max: " << primitive.aabb.max.x << " " << primitive.aabb.max.y << " " << primitive.aabb.max.z << std::endl;*/
+
+                        glm::vec4 min = tc.model_matrix * glm::vec4(primitive.aabb.min, 1.0);
+                        glm::vec4 max = tc.model_matrix * glm::vec4(primitive.aabb.max, 1.0);
+
+                        /*std::cout << "------new--AABB------------" << std::endl;
+                        std::cout << "min: " << min.x << " " << min.y << " " << min.z << std::endl;
+                        std::cout << "max: " << max.x << " " << max.y << " " << max.z << std::endl;*/
+
+                        /*aabbs.push_back(AABB {
+                            .min = { min.x, min.y, min.z },
+                            .max = { max.x, max.y, max.z }
+                        });*/
+
+
+                        lines.push_back(glm::vec3{ min[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ min[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ min[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ min[0], min[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], max[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], min[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], min[1], max[2] });
+                        lines.push_back(glm::vec3{ min[0], min[1], max[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], max[2] });
+                        lines.push_back(glm::vec3{ max[0], max[1], max[2] });
+                        lines.push_back(glm::vec3{ max[0], min[1], max[2] });
+                    }
+                }
+            });
+
+            /*for(auto& line : lines) {
+                std::cout << line.x << " " << line.y << " " << line.z << std::endl;
+            }*/
+
+            lines_vertices = lines.size();
+
+            if(!lines_buffer.is_empty()) { device.destroy_buffer(lines_buffer); }
+
+            lines_buffer = device.create_buffer(daxa::BufferInfo{
+                .memory_flags = daxa::MemoryFlagBits::DEDICATED_MEMORY,
+                .size = static_cast<u32>(sizeof(SimpleVertex) * lines.size()),
+                .debug_name = "lines_buffer",
+            });
+
+            daxa::BufferId staging_lines_buffer = device.create_buffer(daxa::BufferInfo{
+                .memory_flags = daxa::MemoryFlagBits::HOST_ACCESS_RANDOM,
+                .size = static_cast<u32>(sizeof(SimpleVertex) * lines.size()),
+                .debug_name = "lines_buffer",
+            });
+
+            auto cmd_list = device.create_command_list({
+                .debug_name = "",
+            });
+
+            cmd_list.destroy_buffer_deferred(staging_lines_buffer);
+
+            auto* buffer_ptr = device.get_host_address_as<SimpleVertex>(staging_lines_buffer);
+            std::memcpy(buffer_ptr, lines.data(), lines.size() * sizeof(SimpleVertex));
+
+            cmd_list.pipeline_barrier({
+                .awaited_pipeline_access = daxa::AccessConsts::HOST_WRITE,
+                .waiting_pipeline_access = daxa::AccessConsts::TRANSFER_READ,
+            });
+
+            cmd_list.copy_buffer_to_buffer({
+                .src_buffer = staging_lines_buffer,
+                .dst_buffer = lines_buffer,
+                .size = static_cast<u32>(sizeof(SimpleVertex) * lines.size()),
+            });
+
+            cmd_list.pipeline_barrier({
+                .awaited_pipeline_access = daxa::AccessConsts::TRANSFER_WRITE,
+                .waiting_pipeline_access = daxa::AccessConsts::VERTEX_SHADER_READ,
+            });
+            cmd_list.complete();
+            device.submit_commands({
+                .command_lists = {std::move(cmd_list)},
+            });
+        }
     }
 
     void Scene::physics_update(f32 delta_time) {

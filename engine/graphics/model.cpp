@@ -20,8 +20,8 @@ namespace Stellar {
             throw std::runtime_error("couldn't find a model");
         }
 
-        constexpr static u32 process_flags = aiProcess_Triangulate | aiProcess_OptimizeMeshes | aiProcess_JoinIdenticalVertices |
-			            aiProcess_GenNormals | aiProcess_CalcTangentSpace | aiProcess_PreTransformVertices | aiProcess_FlipUVs;
+        constexpr static u32 process_flags = aiProcess_Triangulate/* | aiProcess_OptimizeMeshes | aiProcess_JoinIdenticalVertices*/ |
+			            aiProcess_GenNormals | aiProcess_CalcTangentSpace/* | aiProcess_PreTransformVertices*/ | aiProcess_FlipUVs;
 			//aiProcess_MakeLeftHanded |
 
         Assimp::Importer importer;
@@ -392,7 +392,24 @@ namespace Stellar {
             uint32_t vertexCount = 0;
             uint32_t indexCount = 0;
 
+            AABB aabb = {
+                .min = glm::vec3{ std::numeric_limits<f32>::max() },
+                .max = glm::vec3{ std::numeric_limits<f32>::lowest() }
+            };
+
             for (u32 i = 0; i < mesh->mNumVertices; i++) {
+
+                /*aabb.min.x = glm::min(aabb.min.x, factor * mesh->mVertices[i].x);
+                aabb.min.y = glm::min(aabb.min.y, factor * mesh->mVertices[i].y);
+                aabb.min.z = glm::min(aabb.min.z, factor * mesh->mVertices[i].z);
+
+                aabb.max.x = glm::max(aabb.max.x, factor * mesh->mVertices[i].x);
+                aabb.max.y = glm::max(aabb.max.y, factor * mesh->mVertices[i].y);
+                aabb.max.z = glm::max(aabb.max.z, factor * mesh->mVertices[i].z);*/
+
+                aabb.min = glm::min(aabb.min, factor * glm::vec3{ mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z });
+                aabb.max = glm::max(aabb.max, factor * glm::vec3{ mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z });
+
                 vertices.push_back(Vertex {
                     .positions = {
                         factor * mesh->mVertices[i].x,
@@ -430,7 +447,8 @@ namespace Stellar {
                 .first_vertex = vertexOffset,
                 .index_count = indexCount,
                 .vertex_count = vertexCount,
-                .material_index = index
+                .material_index = index,
+                .aabb = aabb
             };
 
             primitives.push_back(temp_primitive);

@@ -91,6 +91,24 @@ namespace Stellar {
             .debug_name = "billboard_pipeline",
         }).value();
 
+        lines_pipeline = context.pipeline_manager.add_raster_pipeline({
+            .vertex_shader_info = {.source = daxa::ShaderFile{"lines.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
+            .fragment_shader_info = {.source = daxa::ShaderFile{"lines.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
+            .color_attachments = {{ .format = daxa::Format::R8G8B8A8_SRGB }},
+            .depth_test = {
+                .depth_attachment_format = daxa::Format::D32_SFLOAT,
+                .enable_depth_test = true,
+                .enable_depth_write = true,
+            },
+            .raster = {
+                .primitive_topology = daxa::PrimitiveTopology::LINE_LIST,
+                .polygon_mode = daxa::PolygonMode::LINE,
+                .face_culling = daxa::FaceCullFlagBits::NONE
+            },
+            .push_constant_size = sizeof(LinesPush),
+            .debug_name = "lines_pipeline",
+        }).value();
+
         atmosphere_pipeline = context.pipeline_manager.add_raster_pipeline({
             .vertex_shader_info = {.source = daxa::ShaderFile{"atmosphere.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_VERT"}}}},
             .fragment_shader_info = {.source = daxa::ShaderFile{"atmosphere.glsl"}, .compile_options = {.defines = {daxa::ShaderDefine{"DRAW_FRAG"}}}},
@@ -346,6 +364,13 @@ namespace Stellar {
 
             cmd_list.draw({ .vertex_count = 6 });
         });
+
+        cmd_list.set_pipeline(*lines_pipeline);
+        cmd_list.push_constant(LinesPush {
+            .vertex_buffer = context.device.get_device_address(scene->lines_buffer),
+            .camera_info = context.device.get_device_address(editor_camera_buffer),
+        });
+        cmd_list.draw({ .vertex_count = scene->lines_vertices });
 
         glm::mat4 model_matrix = glm::translate(glm::mat4{1.0f}, glm::vec3{ 0.0f, 0.0f, 0.0f }) * glm::scale(glm::mat4{1.0f}, glm::vec3{ 1000.0f, 1000.0f, 1000.0f });
 

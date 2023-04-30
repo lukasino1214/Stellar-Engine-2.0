@@ -163,6 +163,11 @@ struct GaussPush {
     daxa_f32vec2 blur_scale;
 };
 
+struct LinesPush {
+    daxa_RWBufferPtr(SimpleVertex) vertex_buffer;
+    daxa_RWBufferPtr(CameraInfo) camera_info;
+};
+
 #define sample_texture(tex, uv) texture(tex.texture_id, tex.sampler_id, uv)
 
 #define MATERIAL deref(daxa_push_constant.material_buffer[daxa_push_constant.material_index])
